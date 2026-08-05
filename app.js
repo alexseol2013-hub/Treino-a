@@ -311,4 +311,468 @@ function toggleSet(i,j){
 }
 
 function toggleEx(i){const d=draft();d.exDone[i]=!d.exDone[i];save();renderWorkout()}
-function startWorkout(){const d=draft();if(!d.startedAt){d.startedAt=Date.now();save();toast('Treino iniciado')}renderWor
+function startWorkout(){const d=draft();if(!d.startedAt){d.startedAt=Date.now();save();toast('Treino iniciado')}renderWorkout()}
+function saveCardio(){const d=draft();d.cardio={time:document.getElementById('cardioTime').value,dist:document.getElementById('cardioDist').value,bpm:document.getElementById('cardioBpm').value,obs:document.getElementById('cardioObs').value};save();toast('Cardio salvo')}
+
+function finishWorkout(){
+    const d=draft();
+    if(!d.startedAt){toast('Inicie o treino antes de finalizar');return}
+    saveCardio();
+    const v=DATA[current];
+    d.restTotal=restTotalForDraft();
+    const metrics = calculateDraftMetrics(d);
+    
+    const record={
+        id:uid(),
+        date:new Date().toISOString(),
+        workout:current,
+        name:v.name,
+        duration:Math.floor((Date.now()-d.startedAt)/1000),
+        restDuration:d.restTotal,
+        totalVolume:metrics.totalVolume,
+        totalWeightRaw:metrics.totalWeightRaw,
+        data:JSON.parse(JSON.stringify(d))
+    };
+    
+    db.history.push(record);
+    delete db.drafts[current];
+    save();
+    stopTotalTimer();
+    clearInterval(timerId);
+    stopAllRestTimers();
+
+    showVictoryModal(record);
+}
+
+// MODAL DE VITÓRIA / LEVEL UP AO FINALIZAR TREINO
+function showVictoryModal(record){
+    const stats = getUserStats();
+    const cardioMin = parseFloat(record.data?.cardio?.time) || 0;
+    const xpGained = 25 + Math.floor(cardioMin * 0.5);
+
+    app.innerHTML = `<div class="app" style="text-align:center; padding-top:40px;">
+        <div style="font-size: 50px;">⚡</div>
+        <h1 style="color:#ffd700; font-size:26px; text-transform:uppercase; margin-top:10px;">MISSÃO CONCLUÍDA!</h1>
+        <div class="muted">Você completou o ${esc(record.name)}</div>
+
+        <div class="card" style="border: 1px solid var(--accent, #00d2ff); background: rgba(0, 210, 255, 0.05); margin-top:20px; text-align:left;">
+            <div style="font-size:14px; font-weight:bold; color:var(--accent,#00d2ff);">+${xpGained} EXP ADICIONADOS</div>
+            <div style="font-size:18px; font-weight:bold; margin-top:6px;">Nível ${stats.level} <span style="font-size:12px; color:#aaa;">(${stats.currentLevelXP}%)</span></div>
+            <div style="width: 100%; background: rgba(255,255,255,0.1); height: 10px; border-radius: 5px; overflow: hidden; margin-top: 8px;">
+                <div style="width: ${stats.currentLevelXP}%; background: linear-gradient(90deg, #0072ff, #00d2ff); height: 100%;"></div>
+            </div>
+            
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:15px; font-size:13px; border-top:1px solid rgba(255,255,255,0.08); padding-top:10px;">
+                <div>Volume Total:<br><strong style="color:#fff;">${record.totalVolume.toLocaleString('pt-BR')} kg</strong></div>
+                <div>Tempo:<br><strong style="color:#fff;">${formatDuration(record.duration)}</strong></div>
+            </div>
+        </div>
+
+        <button class="primary" style="margin-top:25px; width:100%; padding:16px; font-weight:bold;" onclick="home()">VOLTAR AO PAINEL PRINCIPAL</button>
+    </div>`;
+}
+
+function cancelWorkout(){if(confirm('Sair agora? O rascunho ficará salvo para continuar depois.')){stopTotalTimer();clearInterval(timerId);stopAllRestTimers();home()}}
+function startTotalTimer(){stopTotalTimer();totalTimerId=setInterval(()=>{const d=draft();const x=document.getElementById('totalTime');if(x&&d.startedAt)x.textContent=formatDuration(Math.floor((Date.now()-d.startedAt)/1000));const y=document.getElementById('restTotalLabel');if(y)y.textContent='Descanso registrado: '+formatDuration(restTotalForDraft())},1000)}
+function stopTotalTimer(){if(totalTimerId)clearInterval(totalTimerId);totalTimerId=null}
+function formatDuration(n){n=Math.max(0,Math.floor(n));const h=Math.floor(n/3600),m=Math.floor((n%3600)/60),s=n%60;if(h)return `${h}h ${m}min`;if(m)return `${m}min ${String(s).padStart(2,'0')}s`;return `00:${String(s).padStart(2,'0')}`}
+function fmt(n){n=Math.max(0,Math.floor(n));return String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0')}
+
+function restTotalForDraft(){const d=draft();return (d.restTotal||0)+(db.restState?.startedAt&&db.restState?.deadline?Math.max(0,Math.min(db.restState.total,Math.floor((Date.now()-db.restState.startedAt)/1000))):0)}
+function setGlobalRest(seconds){stopGlobalRest(false);db.restState={deadline:0,total:seconds,startedAt:0};save();updateGlobalRestUI()}
+
+async function requestNotifications(){try{if('Notification' in window&&Notification.permission==='default')await Notification.requestPermission()}catch(e){}}
+
+function notifyRestDone(){
+    navigator.vibrate?.([250,100,250,100,400]);
+    if('Notification' in window&&Notification.permission==='granted'){
+        try{new Notification('Solo Leveling',{body:'⏱️ Descanso concluído! Volte para a próxima série.',icon:'icon.svg',tag:'solo-rest'})}catch(e){}
+    }
+    alert('⏱️ Descanso terminado! Volte ao treino.');
+}
+
+function updateGlobalRestUI(){
+    const el=document.getElementById('globalRestClock');
+    if(!el)return;
+    let left=db.restState?.deadline?Math.max(0,Math.ceil((db.restState.deadline-Date.now())/1000)):(db.restState?.total||0);
+    el.textContent=fmt(left);
+}
+
+function startGlobalRest(){
+    requestNotifications();
+    if(db.restState?.deadline)stopGlobalRest(false);
+    const total = db.restState?.total > 0 ? db.restState.total : 60;
+    
+    db.restState = {
+        startedAt: Date.now(),
+        deadline: Date.now() + total * 1000,
+        total: total
+    };
+    save();
+    
+    clearInterval(timerId);
+    timerId=setInterval(()=>{
+        const now = Date.now();
+        if(now >= db.restState.deadline){
+            clearInterval(timerId);
+            timerId=null;
+            const d=draft();
+            d.restTotal=(d.restTotal||0)+db.restState.total;
+            db.restState={deadline:0,total:0,startedAt:0};
+            save();
+            updateGlobalRestUI();
+            notifyRestDone();
+        } else {
+            updateGlobalRestUI();
+        }
+    }, 500);
+    updateGlobalRestUI();
+}
+
+function stopGlobalRest(commit=true){
+    if(timerId)clearInterval(timerId);
+    timerId=null;
+    if(commit&&db.restState?.deadline){
+        const d=draft();
+        d.restTotal=(d.restTotal||0)+Math.max(0,Math.min(db.restState.total,Math.floor((Date.now()-db.restState.startedAt)/1000)));
+    }
+    db.restState={deadline:0,total:0,startedAt:0};
+    save();
+}
+function stopAllRestTimers(){stopGlobalRest(true)}
+
+function setEvolutionMetric(m){
+    currentEvolutionMetric = m;
+    evolutionScreen();
+}
+
+function evolutionScreen(){
+    stopTotalTimer();
+    screen='evolution';
+    
+    const historyExMap = {};
+    
+    db.history.slice().sort((a,b)=>new Date(a.date)-new Date(b.date)).forEach(record => {
+        const workoutData = DATA[record.workout];
+        if(!workoutData) return;
+        const dateStr = new Date(record.date).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'});
+        const fullDate = new Date(record.date);
+
+        workoutData.ex.forEach((exInfo, exIndex) => {
+            const exName = exInfo[0];
+            historyExMap[exName] = historyExMap[exName] || [];
+            
+            let maxKg = 0, maxReps = 0, totalExVol = 0, totalExReps = 0;
+            
+            expandedGroups(exInfo[1]).forEach((row, setIndex) => {
+                const setData = record.data.sets[`${record.workout}-${exIndex}-${setIndex}`] || {};
+                const kg = parseFloat(setData.kg) || 0;
+                const reps = parseInt(setData.reps) || 0;
+                if(kg > maxKg || (kg === maxKg && reps > maxReps)) {
+                    maxKg = kg;
+                    maxReps = reps;
+                }
+                totalExVol += (kg * reps);
+                totalExReps += reps;
+            });
+
+            if(maxKg > 0) {
+                historyExMap[exName].push({ dateStr, fullDate, kg: maxKg, topReps: maxReps, totalReps: totalExReps, volume: totalExVol });
+            }
+        });
+    });
+
+    let html = `<div class="app">${header('Evolução de Cargas & Volume')}
+    <div style="display:flex; gap:6px; margin-bottom:15px;">
+        <button class="${currentEvolutionMetric==='kg'?'primary':'secondary'}" style="flex:1; padding:8px; font-size:12px;" onclick="setEvolutionMetric('kg')">Carga Max (kg)</button>
+        <button class="${currentEvolutionMetric==='reps'?'primary':'secondary'}" style="flex:1; padding:8px; font-size:12px;" onclick="setEvolutionMetric('reps')">Total Reps</button>
+        <button class="${currentEvolutionMetric==='volume'?'primary':'secondary'}" style="flex:1; padding:8px; font-size:12px;" onclick="setEvolutionMetric('volume')">Volume (kg)</button>
+    </div>`;
+
+    const exNames = Object.keys(historyExMap);
+
+    if(exNames.length === 0){
+        html += `<div class="empty">Nenhum histórico registrado ainda. Complete treinos para ver a evolução aqui!</div>`;
+    } else {
+        exNames.forEach(exName => {
+            const records = historyExMap[exName];
+            if(records.length === 0) return;
+            
+            const recent = records.slice().reverse().slice(0, 5);
+            const latest = recent[0];
+            const oldest = recent[recent.length - 1];
+            
+            let maxVal = 1;
+            if(currentEvolutionMetric==='kg') maxVal = Math.max(...recent.map(r => r.kg)) || 1;
+            if(currentEvolutionMetric==='reps') maxVal = Math.max(...recent.map(r => r.totalReps)) || 1;
+            if(currentEvolutionMetric==='volume') maxVal = Math.max(...recent.map(r => r.volume)) || 1;
+
+            const kgDiff = latest.kg - oldest.kg;
+            const daysDiff = Math.round((latest.fullDate - oldest.fullDate) / (1000 * 60 * 60 * 24));
+            
+            let badgeDiff = '';
+            if(recent.length > 1 && daysDiff > 0){
+                const sign = kgDiff >= 0 ? '+' : '';
+                const color = kgDiff >= 0 ? '#4caf50' : '#f44336';
+                badgeDiff = `<div style="color:${color}; font-weight:bold; margin-top:8px; font-size:12px;">↑ ${sign}${kgDiff}kg de carga max em ${daysDiff} dias</div>`;
+            }
+
+            html += `<div class="card">
+                <div class="exercise-name" style="margin-bottom:12px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom:6px;">${esc(exName)}</div>
+                
+                <div style="display:flex; flex-direction:column; gap:8px;">
+                    ${recent.map(r => {
+                        let val = r.kg;
+                        let label = `${r.kg}kg (Top: ${r.topReps} reps)`;
+                        if(currentEvolutionMetric === 'reps') {
+                            val = r.totalReps;
+                            label = `${r.totalReps} reps totais`;
+                        } else if(currentEvolutionMetric === 'volume') {
+                            val = r.volume;
+                            label = `${r.volume.toLocaleString('pt-BR')}kg vol`;
+                        }
+                        
+                        const pct = Math.max(12, Math.round((val / maxVal) * 100));
+                        
+                        return `<div>
+                            <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:2px;">
+                                <span style="font-weight:bold; color:var(--accent,#00d2ff);">${r.dateStr}</span>
+                                <span><strong>${label}</strong></span>
+                            </div>
+                            <div style="width:100%; background:rgba(255,255,255,0.08); height:8px; border-radius:4px; overflow:hidden;">
+                                <div style="width:${pct}%; background:linear-gradient(90deg, #00d2ff, #0072ff); height:100%;"></div>
+                            </div>
+                        </div>`;
+                    }).join('')}
+                </div>
+                ${badgeDiff}
+            </div>`;
+        });
+    }
+
+    html += `</div>`;
+    app.innerHTML = html;
+}
+
+function recordsScreen(){
+    stopTotalTimer();
+    screen='records';
+    
+    const prMap = {};
+    let lastPRBroken = null;
+
+    const sortedHistory = db.history.slice().sort((a,b) => new Date(a.date) - new Date(b.date));
+
+    sortedHistory.forEach(record => {
+        const workoutData = DATA[record.workout];
+        if(!workoutData) return;
+        const dateStr = new Date(record.date).toLocaleDateString('pt-BR');
+
+        workoutData.ex.forEach((exInfo, exIndex) => {
+            const exName = exInfo[0];
+            
+            expandedGroups(exInfo[1]).forEach((row, setIndex) => {
+                const setData = record.data.sets[`${record.workout}-${exIndex}-${setIndex}`] || {};
+                const kg = parseFloat(setData.kg) || 0;
+                const reps = parseInt(setData.reps) || 0;
+
+                if(kg > 0) {
+                    const currentBestKg = prMap[exName]?.kg || 0;
+                    const currentBestReps = prMap[exName]?.reps || 0;
+
+                    if(kg > currentBestKg || (kg === currentBestKg && reps > currentBestReps)){
+                        const item = { exName, kg, reps, dateStr };
+                        prMap[exName] = item;
+                        lastPRBroken = item;
+                    }
+                }
+            });
+        });
+    });
+
+    let html = `<div class="app">${header('Recordes Pessoais (PRs)')}`;
+
+    if(lastPRBroken){
+        html += `<div class="card" style="border: 1px solid #ffd700; background: rgba(255, 215, 0, 0.08); margin-bottom: 20px;">
+            <div style="font-size:11px; color:#ffd700; text-transform:uppercase; font-weight:bold;">🏆 ÚLTIMO RECORDE BATIDO</div>
+            <div style="font-size:16px; font-weight:bold; margin-top:4px;">${esc(lastPRBroken.exName)}</div>
+            <div style="font-size:22px; font-weight:bold; color:#ffd700; margin-top:2px;">${lastPRBroken.kg} kg <span style="font-size:14px; color:#fff; font-weight:normal;">× ${lastPRBroken.reps} reps</span></div>
+            <div class="muted" style="margin-top:2px;">Conquistado em ${lastPRBroken.dateStr}</div>
+        </div>`;
+    }
+
+    const prList = Object.values(prMap).sort((a,b) => b.kg - a.kg);
+
+    if(prList.length === 0){
+        html += `<div class="empty">Nenhum recorde registrado. Treine duro e registre suas cargas!</div>`;
+    } else {
+        html += `<div style="display:flex; flex-direction:column; gap:10px;">`;
+        prList.forEach(pr => {
+            html += `<div class="card" style="display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <div style="font-weight:bold; font-size:15px;">🏆 ${esc(pr.exName)}</div>
+                    <div class="muted" style="font-size:12px;">Alcançado em ${pr.dateStr}</div>
+                </div>
+                <div style="text-align:right;">
+                    <div style="font-size:18px; font-weight:bold; color:var(--accent,#00d2ff);">${pr.kg} kg</div>
+                    <div style="font-size:12px; color:#aaa;">${pr.reps} reps</div>
+                </div>
+            </div>`;
+        });
+        html += `</div>`;
+    }
+
+    html += `</div>`;
+    app.innerHTML = html;
+}
+
+function getWeeklyComparison(){
+    const now = new Date();
+    const startThisWeek = new Date(now.setDate(now.getDate() - now.getDay())).setHours(0,0,0,0);
+    const startLastWeek = new Date(startThisWeek - 7*24*60*60*1000).getTime();
+
+    let thisWeekVol = 0, lastWeekVol = 0;
+    let thisWeekTime = 0, lastWeekTime = 0;
+    let thisWeekCardio = 0, lastWeekCardio = 0;
+    let thisWeekCount = 0, lastWeekCount = 0;
+
+    db.history.forEach(r => {
+        const t = new Date(r.date).getTime();
+        const vol = r.totalVolume || 0;
+        const dur = r.duration || 0;
+        const cardio = parseFloat(r.data?.cardio?.time) || 0;
+
+        if(t >= startThisWeek){
+            thisWeekVol += vol;
+            thisWeekTime += dur;
+            thisWeekCardio += cardio;
+            thisWeekCount++;
+        } else if(t >= startLastWeek && t < startThisWeek){
+            lastWeekVol += vol;
+            lastWeekTime += dur;
+            lastWeekCardio += cardio;
+            lastWeekCount++;
+        }
+    });
+
+    const volDiffPct = lastWeekVol > 0 ? (((thisWeekVol - lastWeekVol) / lastWeekVol) * 100).toFixed(1) : 0;
+
+    return {
+        thisWeekTon: (thisWeekVol / 1000).toFixed(1),
+        lastWeekTon: (lastWeekVol / 1000).toFixed(1),
+        volDiffPct,
+        thisWeekTime: formatDuration(thisWeekTime),
+        thisWeekCardio,
+        thisWeekCount
+    };
+}
+
+function historyScreen(){
+    stopTotalTimer();
+    screen='history';
+    const weekly = getWeeklyComparison();
+
+    let html = `<div class="app">${header('Histórico & Estatísticas')}
+    
+    <div class="card" style="background: rgba(0, 210, 255, 0.05); border: 1px solid rgba(0, 210, 255, 0.2); margin-bottom:20px;">
+        <div style="font-weight:bold; font-size:14px; margin-bottom:8px; color:var(--accent,#00d2ff);">🎯 EVOLUÇÃO SEMANAL (VOLUME)</div>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; font-size:13px;">
+            <div><span class="muted">Semana passada:</span><br><strong>${weekly.lastWeekTon} toneladas</strong></div>
+            <div><span class="muted">Esta semana:</span><br><strong>${weekly.thisWeekTon} toneladas</strong></div>
+        </div>
+        <div style="margin-top:8px; font-size:12px; font-weight:bold; color:${weekly.volDiffPct>=0?'#4caf50':'#f44336'};">
+            ${weekly.volDiffPct>=0?'↑ +':'↓ '}${weekly.volDiffPct}% de volume esta semana
+        </div>
+        <div style="margin-top:10px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.08); font-size:12px; display:flex; justify-content:space-between;">
+            <span>Treinos: <strong>${weekly.thisWeekCount}</strong></span>
+            <span>Tempo: <strong>${weekly.thisWeekTime}</strong></span>
+            <span>Cardio: <strong>${weekly.thisWeekCardio} min</strong></span>
+        </div>
+    </div>`;
+
+    if(db.history.length === 0){
+        html += `<div class="empty">Ainda não há treinos finalizados.</div>`;
+    } else {
+        html += db.history.slice().reverse().map(r => {
+            const d = new Date(r.date);
+            const volStr = r.totalVolume ? ` · Volume: ${(r.totalVolume/1000).toFixed(1)}t` : '';
+            const rawStr = r.totalWeightRaw ? ` (${r.totalWeightRaw}kg bruto)` : '';
+            return `<div class="history-item">
+                <div class="row"><strong>${r.name}</strong><span class="pill">${d.toLocaleDateString('pt-BR')} ${d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</span></div>
+                <div class="muted">Duração: ${formatDuration(r.duration)}${volStr}${rawStr}</div>
+                <button class="secondary" onclick="viewRecord('${r.id}')">Ver treino completo</button>
+            </div>`;
+        }).join('');
+    }
+
+    html += `</div>`;
+    app.innerHTML = html;
+}
+
+function deleteRecord(id){
+    if(confirm('Tem certeza que deseja excluir este treino específico do histórico?')){
+        db.history = db.history.filter(x => x.id !== id);
+        save();
+        toast('Treino excluído do histórico');
+        historyScreen();
+    }
+}
+
+function viewRecord(id){
+    const r=db.history.find(x=>x.id===id),v=DATA[r.workout];
+    let html=`<div class="app">${header('Registro do treino')}<div class="muted">${new Date(r.date).toLocaleString('pt-BR')} · Duração ${formatDuration(r.duration)}<br>Volume: ${(r.totalVolume||0).toLocaleString('pt-BR')} kg · Carga Bruta: ${(r.totalWeightRaw||0).toLocaleString('pt-BR')} kg</div>`;
+    
+    v.ex.forEach((ex,i)=>{
+        html+=`<div class="card"><div class="exercise-name">${i+1}. ${esc(ex[0])}</div>`;
+        expandedGroups(ex[1]).forEach((row,j)=>{
+            const s=row.group,x=r.data.sets[`${r.workout}-${i}-${j}`]||{};
+            html+=`<div class="set"><div class="settype">${esc(s[0])} · Série ${row.number}/${row.total}</div><div class="muted">Planejado: ${esc(s[2])} reps · ${esc(s[3])}</div><div style="margin-top:7px"><b>${x.kg||'—'} kg</b> · ${x.reps||'—'} reps ${x.done?'· ✓ concluída':''}</div>${x.obs?`<div class="muted">${esc(x.obs)}</div>`:''}</div>`;
+        });
+        html+=`<div class="card">`;
+    });
+    
+    const c=r.data.cardio||{};
+    html+=`<div class="section-title">Cardio do dia</div><div class="card">${c.time||'—'} min · ${c.dist||'—'} km · ${c.bpm||'—'} BPM médio${c.obs?`<div class="muted">${esc(c.obs)}</div>`:''}</div><button class="secondary danger" style="margin-top:20px" onclick="deleteRecord('${r.id}')">Excluir este treino</button></div>`;
+    app.innerHTML=html;
+}
+
+function settingsScreen(){
+    stopTotalTimer();
+    screen='settings';
+    app.innerHTML=`<div class="app">${header('Configurações')}
+    <div class="card" style="margin-bottom:15px;">
+        <label>Nome do Caçador
+            <input type="text" id="userNameInput" value="${esc(db.user.name)}" style="margin-top:5px;">
+        </label>
+        <button class="secondary" style="margin-top:10px;" onclick="updateUserName()">💾 Salvar Nome</button>
+    </div>
+    <button class="secondary" onclick="exportData()">⬇️ Exportar histórico (Backup)</button>
+    <button class="secondary" onclick="clearDrafts()">🧹 Limpar rascunhos não finalizados</button>
+    <button class="secondary danger" onclick="wipeHistory()">Apagar histórico</button></div>`;
+}
+
+function updateUserName(){
+    const input = document.getElementById('userNameInput').value.trim();
+    if(input){
+        db.user.name = input;
+        save();
+        toast('Nome atualizado!');
+    }
+}
+
+function clearDrafts(){if(confirm('Apagar todos os treinos que estão apenas como rascunho?')){db.drafts={};save();toast('Rascunhos apagados')}}
+function wipeHistory(){if(confirm('Apagar todo o histórico?')){db.history=[];save();historyScreen()}}
+function exportData(){const b=new Blob([JSON.stringify(db,null,2)],{type:'application/json'}),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download='solo-leveling-historico.json';a.click();URL.revokeObjectURL(u)}
+
+function pdfScreen(){
+    app.innerHTML=`<div class="app">${header('Planilha / PDF')}
+    <div class="pdfbox"><p><b>Planilha original</b></p><p class="muted">A planilha original usada para configurar A–E está incluída no app.</p><a class="secondary" style="display:block;text-align:center;text-decoration:none" href="planilha-original.pdf" target="_blank">Abrir planilha original</a></div>
+    <div class="section-title">Consultar outro PDF</div>
+    <div class="card"><input type="file" accept="application/pdf" id="pdfInput"><p class="muted">O PDF selecionado fica apenas no aparelho para consulta.</p></div></div>`;
+    document.getElementById('pdfInput').onchange=e=>{const f=e.target.files[0];if(f){const u=URL.createObjectURL(f);window.open(u,'_blank')}}
+}
+
+function goHome(){stopTotalTimer();clearInterval(timerId);stopAllRestTimers();home()}
+
+home();
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js?v=11');
