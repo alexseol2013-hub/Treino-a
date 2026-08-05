@@ -1,5 +1,0 @@
-{
-"name":"Treino A","short_name":"Treino A","start_url":".","display":"standalone",
-"background_color":"#121212","theme_color":"#ff5500","lang":"pt-BR",
-"icons":[{"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
-}
