@@ -45,7 +45,12 @@ E:{name:'Treino E',desc:'Bíceps, costas e abdômen',mob:'Mobilidade de ombros e
 const KEY='solo_leveling_v11';
 let db=JSON.parse(localStorage.getItem(KEY)||'null')||{history:[],drafts:{},user:{name:'Alexsandro'},restState:{deadline:0,total:0,startedAt:0}};
 let screen='home',current=null,timerId=null,totalTimerId=null;
+
+// Filtros Globais para as abas de Evolução e Recordes
 let currentEvolutionMetric = 'kg'; 
+let currentEvolutionFilter = 'ALL';
+let currentRecordsFilter = 'ALL';
+
 let wakeLock = null;
 const app=document.getElementById('app');
 
@@ -102,22 +107,37 @@ function playBeep() {
         const gain = audioCtx.createGain();
         osc.type = 'sine';
         osc.frequency.setValueAtTime(880, audioCtx.currentTime);
-        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
         osc.connect(gain);
         gain.connect(audioCtx.destination);
         osc.start();
-        osc.stop(audioCtx.currentTime + 0.35);
+        osc.stop(audioCtx.currentTime + 1.5); // Bipe longo (1.5 segundos)
     } catch(e) {}
 }
 
 async function requestNotifications(){try{if('Notification' in window&&Notification.permission==='default')await Notification.requestPermission()}catch(e){}}
 
+function showRestAlertModal() {
+    const div = document.createElement('div');
+    div.innerHTML = `
+        <div style="background:#151520; padding:40px 20px; border-radius:16px; border:2px solid #00d2ff; text-align:center; width:90%; max-width:350px; box-shadow: 0 0 30px rgba(0, 210, 255, 0.4);">
+            <div style="font-size:50px; margin-bottom:10px;">⏰</div>
+            <h2 style="color:#00d2ff; margin:0 0 10px 0; font-size:24px;">TEMPO ESGOTADO!</h2>
+            <p style="color:#fff; margin-bottom:25px; font-size:16px;">Hora de voltar para a próxima série. Arrebenta!</p>
+            <button class="primary" style="width:100%; padding:14px; font-size:16px; font-weight:bold;" onclick="this.parentElement.parentElement.remove()">ESTOU PRONTO</button>
+        </div>
+    `;
+    div.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:99999; display:flex; align-items:center; justify-content:center; animation: fadeIn 0.3s;';
+    document.body.appendChild(div);
+}
+
 function notifyRestDone(){
     playBeep();
-    navigator.vibrate?.([250,100,250,100,400]);
+    navigator.vibrate?.([500,200,500,200,800]); // Vibração mais forte
     if('Notification' in window && Notification.permission==='granted'){
         try{ new Notification('Solo Leveling',{body:'⏱️ Descanso concluído! Volte para a próxima série.',icon:'icon.svg',tag:'solo-rest'}); }catch(e){}
     }
+    showRestAlertModal(); // Alerta na tela
 }
 
 // --- TELAS E LÓGICA CORE ---
@@ -145,8 +165,8 @@ function home(){
     <div style="display: flex; flex-direction: column; gap: 10px;">
         <button class="primary" style="padding: 16px; font-size: 16px; font-weight: bold; text-align: left;" onclick="selectWorkoutScreen()">⚔️ Treinar Agora</button>
         <button class="secondary" style="text-align: left; padding: 14px;" onclick="historyScreen()">📈 Histórico e Estatísticas</button>
-        <button class="secondary" style="text-align: left; padding: 14px;" onclick="evolutionScreen()">📊 Evolução de Cargas & Volume</button>
-        <button class="secondary" style="text-align: left; padding: 14px;" onclick="recordsScreen()">🏆 Recordes Pessoais (PRs)</button>
+        <button class="secondary" style="text-align: left; padding: 14px;" onclick="evolutionScreen(currentEvolutionFilter)">📊 Evolução de Cargas & Volume</button>
+        <button class="secondary" style="text-align: left; padding: 14px;" onclick="recordsScreen(currentRecordsFilter)">🏆 Recordes Pessoais (PRs)</button>
         <button class="secondary" style="text-align: left; padding: 14px;" onclick="settingsScreen()">⚙️ Configurações</button>
         <button class="secondary" style="text-align: left; padding: 14px;" onclick="pdfScreen()">📄 Planilha / PDF</button>
     </div>
@@ -478,14 +498,17 @@ function stopGlobalRest(commit=true){
 function stopAllRestTimers(){stopGlobalRest(true)}
 
 // --- EVOLUÇÃO E RECORDES ---
-function setEvolutionMetric(m){currentEvolutionMetric = m; evolutionScreen();}
+function setEvolutionMetric(m){currentEvolutionMetric = m; evolutionScreen(currentEvolutionFilter);}
 
-function evolutionScreen(){
+function evolutionScreen(filterWorkout = 'ALL'){
     stopTotalTimer();
     screen='evolution';
+    currentEvolutionFilter = filterWorkout;
     const historyExMap = {};
     
     db.history.slice().sort((a,b)=>new Date(a.date)-new Date(b.date)).forEach(record => {
+        if(filterWorkout !== 'ALL' && record.workout !== filterWorkout) return; // Filtro de Treino
+
         const workoutData = DATA[record.workout];
         if(!workoutData) return;
         const dateStr = new Date(record.date).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'});
@@ -493,7 +516,9 @@ function evolutionScreen(){
 
         workoutData.ex.forEach((exInfo, exIndex) => {
             const exName = exInfo[0];
-            historyExMap[exName] = historyExMap[exName] || [];
+            const key = filterWorkout === 'ALL' ? `${exName} (Treino ${record.workout})` : exName;
+
+            historyExMap[key] = historyExMap[key] || [];
             let maxKg = 0, maxReps = 0, totalExVol = 0, totalExReps = 0;
             
             expandedGroups(exInfo[1]).forEach((row, setIndex) => {
@@ -505,11 +530,16 @@ function evolutionScreen(){
                 totalExReps += reps;
             });
 
-            if(maxKg > 0) historyExMap[exName].push({ dateStr, fullDate, kg: maxKg, topReps: maxReps, totalReps: totalExReps, volume: totalExVol });
+            if(maxKg > 0) historyExMap[key].push({ dateStr, fullDate, kg: maxKg, topReps: maxReps, totalReps: totalExReps, volume: totalExVol });
         });
     });
 
     let html = `<div class="app">${header('Evolução de Cargas & Volume')}
+    <div style="display:flex; overflow-x:auto; gap:6px; margin-bottom:12px; padding-bottom:5px;">
+        <button class="${filterWorkout==='ALL'?'primary':'secondary'}" style="white-space:nowrap; padding:6px 12px; font-size:13px;" onclick="evolutionScreen('ALL')">Todos</button>
+        ${Object.keys(DATA).map(k => `<button class="${filterWorkout===k?'primary':'secondary'}" style="white-space:nowrap; padding:6px 12px; font-size:13px;" onclick="evolutionScreen('${k}')">Treino ${k}</button>`).join('')}
+    </div>
+    
     <div style="display:flex; gap:6px; margin-bottom:15px;">
         <button class="${currentEvolutionMetric==='kg'?'primary':'secondary'}" style="flex:1; padding:8px; font-size:12px;" onclick="setEvolutionMetric('kg')">Carga Max (kg)</button>
         <button class="${currentEvolutionMetric==='reps'?'primary':'secondary'}" style="flex:1; padding:8px; font-size:12px;" onclick="setEvolutionMetric('reps')">Total Reps</button>
@@ -518,10 +548,10 @@ function evolutionScreen(){
 
     const exNames = Object.keys(historyExMap);
     if(exNames.length === 0){
-        html += `<div class="empty">Nenhum histórico registrado ainda.</div>`;
+        html += `<div class="empty">Nenhum histórico registrado para este filtro.</div>`;
     } else {
-        exNames.forEach(exName => {
-            const records = historyExMap[exName];
+        exNames.forEach(keyName => {
+            const records = historyExMap[keyName];
             if(records.length === 0) return;
             const recent = records.slice().reverse().slice(0, 5);
             const latest = recent[0];
@@ -539,11 +569,15 @@ function evolutionScreen(){
             if(recent.length > 1 && daysDiff > 0 && currentEvolutionMetric==='kg'){
                 const sign = kgDiff >= 0 ? '+' : '';
                 const color = kgDiff >= 0 ? '#4caf50' : '#f44336';
-                badgeDiff = `<div style="color:${color}; font-weight:bold; margin-top:8px; font-size:12px;">↑ ${sign}${kgDiff}kg de carga max em ${daysDiff} dias</div>`;
+                if(kgDiff !== 0) {
+                    badgeDiff = `<div style="color:${color}; font-weight:bold; margin-top:8px; font-size:12px;">${kgDiff >= 0 ? '↑' : '↓'} ${sign}${kgDiff}kg de carga max em ${daysDiff} dias</div>`;
+                } else {
+                    badgeDiff = `<div style="color:#aaa; margin-top:8px; font-size:12px;">Carga mantida nos últimos ${daysDiff} dias</div>`;
+                }
             }
 
             html += `<div class="card">
-                <div class="exercise-name" style="margin-bottom:12px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom:6px;">${esc(exName)}</div>
+                <div class="exercise-name" style="margin-bottom:12px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom:6px;">${esc(keyName)}</div>
                 <div style="display:flex; flex-direction:column; gap:8px;">
                     ${recent.map(r => {
                         let val = r.kg, label = `${r.kg}kg (Top: ${r.topReps} reps)`;
@@ -570,30 +604,35 @@ function evolutionScreen(){
     app.innerHTML = html;
 }
 
-function recordsScreen(){
+function recordsScreen(filterWorkout = 'ALL'){
     stopTotalTimer();
     screen='records';
+    currentRecordsFilter = filterWorkout;
     const prMap = {};
     let lastPRBroken = null;
 
     db.history.slice().sort((a,b) => new Date(a.date) - new Date(b.date)).forEach(record => {
+        if(filterWorkout !== 'ALL' && record.workout !== filterWorkout) return;
+
         const workoutData = DATA[record.workout];
         if(!workoutData) return;
         const dateStr = new Date(record.date).toLocaleDateString('pt-BR');
 
         workoutData.ex.forEach((exInfo, exIndex) => {
             const exName = exInfo[0];
+            const key = filterWorkout === 'ALL' ? `${exName} (Treino ${record.workout})` : exName;
+
             expandedGroups(exInfo[1]).forEach((row, setIndex) => {
                 const setData = record.data.sets[`${record.workout}-${exIndex}-${setIndex}`] || {};
                 const kg = parseFloat(setData.kg) || 0;
                 const reps = parseInt(setData.reps) || 0;
 
                 if(kg > 0) {
-                    const currentBestKg = prMap[exName]?.kg || 0;
-                    const currentBestReps = prMap[exName]?.reps || 0;
+                    const currentBestKg = prMap[key]?.kg || 0;
+                    const currentBestReps = prMap[key]?.reps || 0;
                     if(kg > currentBestKg || (kg === currentBestKg && reps > currentBestReps)){
-                        const item = { exName, kg, reps, dateStr };
-                        prMap[exName] = item;
+                        const item = { keyName: key, kg, reps, dateStr };
+                        prMap[key] = item;
                         lastPRBroken = item;
                     }
                 }
@@ -601,12 +640,16 @@ function recordsScreen(){
         });
     });
 
-    let html = `<div class="app">${header('Recordes Pessoais (PRs)')}`;
+    let html = `<div class="app">${header('Recordes Pessoais (PRs)')}
+    <div style="display:flex; overflow-x:auto; gap:6px; margin-bottom:15px; padding-bottom:5px;">
+        <button class="${filterWorkout==='ALL'?'primary':'secondary'}" style="white-space:nowrap; padding:6px 12px; font-size:13px;" onclick="recordsScreen('ALL')">Todos</button>
+        ${Object.keys(DATA).map(k => `<button class="${filterWorkout===k?'primary':'secondary'}" style="white-space:nowrap; padding:6px 12px; font-size:13px;" onclick="recordsScreen('${k}')">Treino ${k}</button>`).join('')}
+    </div>`;
 
-    if(lastPRBroken){
+    if(lastPRBroken && filterWorkout === 'ALL'){
         html += `<div class="card" style="border: 1px solid #ffd700; background: rgba(255, 215, 0, 0.08); margin-bottom: 20px;">
             <div style="font-size:11px; color:#ffd700; text-transform:uppercase; font-weight:bold;">🏆 ÚLTIMO RECORDE BATIDO</div>
-            <div style="font-size:16px; font-weight:bold; margin-top:4px;">${esc(lastPRBroken.exName)}</div>
+            <div style="font-size:16px; font-weight:bold; margin-top:4px;">${esc(lastPRBroken.keyName)}</div>
             <div style="font-size:22px; font-weight:bold; color:#ffd700; margin-top:2px;">${lastPRBroken.kg} kg <span style="font-size:14px; color:#fff; font-weight:normal;">× ${lastPRBroken.reps} reps</span></div>
             <div class="muted" style="margin-top:2px;">Conquistado em ${lastPRBroken.dateStr}</div>
         </div>`;
@@ -614,16 +657,16 @@ function recordsScreen(){
 
     const prList = Object.values(prMap).sort((a,b) => b.kg - a.kg);
     if(prList.length === 0){
-        html += `<div class="empty">Nenhum recorde registrado.</div>`;
+        html += `<div class="empty">Nenhum recorde registrado para este filtro.</div>`;
     } else {
         html += `<div style="display:flex; flex-direction:column; gap:10px;">`;
         prList.forEach(pr => {
             html += `<div class="card" style="display:flex; justify-content:space-between; align-items:center;">
-                <div>
-                    <div style="font-weight:bold; font-size:15px;">🏆 ${esc(pr.exName)}</div>
-                    <div class="muted" style="font-size:12px;">Alcançado em ${pr.dateStr}</div>
+                <div style="flex:1; padding-right:10px;">
+                    <div style="font-weight:bold; font-size:14px; line-height:1.2; margin-bottom:4px;">🏆 ${esc(pr.keyName)}</div>
+                    <div class="muted" style="font-size:11px;">Alcançado em ${pr.dateStr}</div>
                 </div>
-                <div style="text-align:right;">
+                <div style="text-align:right; min-width:80px;">
                     <div style="font-size:18px; font-weight:bold; color:var(--accent,#00d2ff);">${pr.kg} kg</div>
                     <div style="font-size:12px; color:#aaa;">${pr.reps} reps</div>
                 </div>
@@ -713,7 +756,7 @@ function viewRecord(id){
             const s=row.group,x=r.data.sets[`${r.workout}-${i}-${j}`]||{};
             html+=`<div class="set"><div class="settype">${esc(s[0])} · Série ${row.number}/${row.total}</div><div class="muted">Planejado: ${esc(s[2])} reps · ${esc(s[3])}</div><div style="margin-top:7px"><b>${x.kg||'—'} kg</b> · ${x.reps||'—'} reps ${x.done?'· ✓ concluída':''}</div>${x.obs?`<div class="muted">${esc(x.obs)}</div>`:''}</div>`;
         });
-        html+=`<div class="card">`;
+        html+=`</div>`; // ERRO VISUAL CORRIGIDO AQUI!
     });
     
     const c=r.data.cardio||{};
