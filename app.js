@@ -46,6 +46,7 @@ const KEY='solo_leveling_v11';
 let db=JSON.parse(localStorage.getItem(KEY)||'null')||{history:[],drafts:{},user:{name:'Alexsandro'},restState:{deadline:0,total:0,startedAt:0}};
 let screen='home',current=null,timerId=null,totalTimerId=null;
 let currentEvolutionMetric = 'kg'; 
+let wakeLock = null;
 const app=document.getElementById('app');
 
 const save=()=>localStorage.setItem(KEY,JSON.stringify(db));
@@ -75,20 +76,51 @@ function getRelativeDate(isoString){
 function getUserStats(){
     const totalWorkouts = db.history.length;
     let totalXP = 0;
-    
     db.history.forEach(r => {
         totalXP += 25;
         const cardioMin = parseFloat(r.data?.cardio?.time) || 0;
         totalXP += Math.floor(cardioMin * 0.5);
     });
-
     const level = Math.floor(totalXP / 100) + 1;
     const currentLevelXP = totalXP % 100;
     const lastWorkout = db.history.length ? db.history[db.history.length - 1].date : null;
-
     return { level, currentLevelXP, totalWorkouts, lastWorkoutDateStr: getRelativeDate(lastWorkout) };
 }
 
+// --- INTEGRAÇÕES DE HARDWARE (Áudio e Tela) ---
+async function requestWakeLock() {
+    try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {}
+}
+function releaseWakeLock() {
+    if (wakeLock) { wakeLock.release(); wakeLock = null; }
+}
+
+function playBeep() {
+    try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.35);
+    } catch(e) {}
+}
+
+async function requestNotifications(){try{if('Notification' in window&&Notification.permission==='default')await Notification.requestPermission()}catch(e){}}
+
+function notifyRestDone(){
+    playBeep();
+    navigator.vibrate?.([250,100,250,100,400]);
+    if('Notification' in window && Notification.permission==='granted'){
+        try{ new Notification('Solo Leveling',{body:'⏱️ Descanso concluído! Volte para a próxima série.',icon:'icon.svg',tag:'solo-rest'}); }catch(e){}
+    }
+}
+
+// --- TELAS E LÓGICA CORE ---
 function home(){
     stopTotalTimer();
     screen='home';
@@ -98,22 +130,18 @@ function home(){
     <div class="card" style="background: linear-gradient(135deg, rgba(20,20,35,0.9), rgba(10,10,20,0.95)); border: 1px solid var(--accent, #00d2ff); box-shadow: 0 0 15px rgba(0,210,255,0.15); border-radius: 12px; padding: 16px; margin-bottom: 20px;">
         <div style="font-size: 13px; color: #88a; text-transform: uppercase; letter-spacing: 1px;">SISTEMA SOLO LEVELING</div>
         <div style="font-size: 20px; font-weight: bold; color: #fff; margin-top: 2px;">${getGreeting()}, ${esc(db.user.name)}</div>
-        
         <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 15px;">
             <span style="font-size: 16px; font-weight: bold; color: var(--accent, #00d2ff);">Nível ${stats.level}</span>
             <span style="font-size: 12px; color: #aaa;">Experiência: ${stats.currentLevelXP}%</span>
         </div>
-        
         <div style="width: 100%; background: rgba(255,255,255,0.1); height: 10px; border-radius: 5px; overflow: hidden; margin-top: 6px;">
             <div style="width: ${stats.currentLevelXP}%; background: linear-gradient(90deg, #0072ff, #00d2ff); height: 100%; transition: width 0.3s;"></div>
         </div>
-
         <div style="display: flex; justify-content: space-between; margin-top: 16px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.08); font-size: 13px;">
             <div><span style="color: #888;">Treinos Concluídos:</span> <strong>${stats.totalWorkouts}</strong></div>
             <div><span style="color: #888;">Último Treino:</span> <strong>${stats.lastWorkoutDateStr}</strong></div>
         </div>
     </div>
-
     <div style="display: flex; flex-direction: column; gap: 10px;">
         <button class="primary" style="padding: 16px; font-size: 16px; font-weight: bold; text-align: left;" onclick="selectWorkoutScreen()">⚔️ Treinar Agora</button>
         <button class="secondary" style="text-align: left; padding: 14px;" onclick="historyScreen()">📈 Histórico e Estatísticas</button>
@@ -132,7 +160,6 @@ function selectWorkoutScreen(){
     </div>`;
 }
 
-// BUSCA A ÚLTIMA CARGA E REPS DE UM EXERCÍCIO ESPECÍFICO NO HISTÓRICO
 function getLastExerciseData(workoutKey, exIndex, setIndex){
     const history = db.history.slice().sort((a,b)=>new Date(b.date)-new Date(a.date));
     for(let record of history){
@@ -213,13 +240,29 @@ function renderWorkout(){
     updateGlobalRestUI();
 }
 
+function swapExercise(i){
+    const currentName = DATA[current].ex[i][0];
+    const newName = prompt('Substituir este exercício por:', currentName);
+    if(newName && newName.trim() !== '' && newName !== currentName){
+        DATA[current].ex[i][0] = newName.trim();
+        renderWorkout();
+        toast('Exercício alterado');
+    }
+}
+
 function exerciseHTML(ex,i,d){
     const [name,groups,tech]=ex;
     const done=!!d.exDone[i];
     if(done)return '';
     const rows=expandedGroups(groups);
     let lastGroup=-1;
-    let html=`<div class="card"><div class="exercise-head"><div class="exercise-name">${i+1}. ${esc(name)}</div><span class="badge">Pendente</span></div>${tech?`<div class="tech">⚡ ${esc(tech)}</div>`:''}`;
+    
+    let html=`<div class="card">
+        <div class="exercise-head" style="display:flex; justify-content:space-between; align-items:center;">
+            <div class="exercise-name" style="flex:1;">${i+1}. ${esc(name)}</div>
+            <button class="mini" type="button" style="margin-left:8px;" onclick="swapExercise(${i})">🔄 Trocar</button>
+        </div>
+        ${tech?`<div class="tech">⚡ ${esc(tech)}</div>`:''}`;
     
     rows.forEach((r,si)=>{
         const [type,qty,reps,rest]=r.group;
@@ -236,11 +279,8 @@ function exerciseHTML(ex,i,d){
             if((lower.includes('drop')||lower.includes('rest pause'))&&isLast)special=`<div class="tech-inline">${esc(tech)}</div>`;
         }
         
-        // DADOS DO TREINO ANTERIOR
         const prev = getLastExerciseData(current, i, si);
         const prevLabel = prev ? `Anterior: ${prev.kg}kg × ${prev.reps}` : 'Primeira vez';
-
-        const setVolume = (parseFloat(x.kg)||0) * (parseInt(x.reps)||0);
         const volumeBadge = `<span style="font-size:11px; color:#00d2ff; margin-left: auto;">${prevLabel}</span>`;
 
         html+=`<div class="set"><div class="sethead"><div class="settype">${esc(type)} · Série ${r.number}/${r.total}</div>${volumeBadge}</div>
@@ -288,7 +328,6 @@ function toggleSet(i,j){
     const d=draft(),k=makeKey(i,j);
     d.sets[k]??={};
 
-    // Preenche com o valor anterior caso o usuário tenha deixado em branco
     if(!d.sets[k].kg || !d.sets[k].reps){
         const prev = getLastExerciseData(current, i, j);
         if(prev){
@@ -298,7 +337,6 @@ function toggleSet(i,j){
     }
 
     d.sets[k].done=!d.sets[k].done;
-    
     const ex = DATA[current].ex[i];
     const rows = expandedGroups(ex[1]);
     const allDone = rows.every((r, si) => d.sets[makeKey(i, si)]?.done);
@@ -311,7 +349,18 @@ function toggleSet(i,j){
 }
 
 function toggleEx(i){const d=draft();d.exDone[i]=!d.exDone[i];save();renderWorkout()}
-function startWorkout(){const d=draft();if(!d.startedAt){d.startedAt=Date.now();save();toast('Treino iniciado')}renderWorkout()}
+
+function startWorkout(){
+    const d=draft();
+    if(!d.startedAt){
+        d.startedAt=Date.now();
+        save();
+        toast('Treino iniciado');
+    }
+    requestWakeLock();
+    renderWorkout();
+}
+
 function saveCardio(){const d=draft();d.cardio={time:document.getElementById('cardioTime').value,dist:document.getElementById('cardioDist').value,bpm:document.getElementById('cardioBpm').value,obs:document.getElementById('cardioObs').value};save();toast('Cardio salvo')}
 
 function finishWorkout(){
@@ -340,11 +389,11 @@ function finishWorkout(){
     stopTotalTimer();
     clearInterval(timerId);
     stopAllRestTimers();
+    releaseWakeLock();
 
     showVictoryModal(record);
 }
 
-// MODAL DE VITÓRIA / LEVEL UP AO FINALIZAR TREINO
 function showVictoryModal(record){
     const stats = getUserStats();
     const cardioMin = parseFloat(record.data?.cardio?.time) || 0;
@@ -367,12 +416,13 @@ function showVictoryModal(record){
                 <div>Tempo:<br><strong style="color:#fff;">${formatDuration(record.duration)}</strong></div>
             </div>
         </div>
-
         <button class="primary" style="margin-top:25px; width:100%; padding:16px; font-weight:bold;" onclick="home()">VOLTAR AO PAINEL PRINCIPAL</button>
     </div>`;
 }
 
-function cancelWorkout(){if(confirm('Sair agora? O rascunho ficará salvo para continuar depois.')){stopTotalTimer();clearInterval(timerId);stopAllRestTimers();home()}}
+function cancelWorkout(){if(confirm('Sair agora? O rascunho ficará salvo para continuar depois.')){stopTotalTimer();clearInterval(timerId);stopAllRestTimers();releaseWakeLock();home()}}
+
+// --- CRONÔMETROS ---
 function startTotalTimer(){stopTotalTimer();totalTimerId=setInterval(()=>{const d=draft();const x=document.getElementById('totalTime');if(x&&d.startedAt)x.textContent=formatDuration(Math.floor((Date.now()-d.startedAt)/1000));const y=document.getElementById('restTotalLabel');if(y)y.textContent='Descanso registrado: '+formatDuration(restTotalForDraft())},1000)}
 function stopTotalTimer(){if(totalTimerId)clearInterval(totalTimerId);totalTimerId=null}
 function formatDuration(n){n=Math.max(0,Math.floor(n));const h=Math.floor(n/3600),m=Math.floor((n%3600)/60),s=n%60;if(h)return `${h}h ${m}min`;if(m)return `${m}min ${String(s).padStart(2,'0')}s`;return `00:${String(s).padStart(2,'0')}`}
@@ -380,16 +430,6 @@ function fmt(n){n=Math.max(0,Math.floor(n));return String(Math.floor(n/60)).padS
 
 function restTotalForDraft(){const d=draft();return (d.restTotal||0)+(db.restState?.startedAt&&db.restState?.deadline?Math.max(0,Math.min(db.restState.total,Math.floor((Date.now()-db.restState.startedAt)/1000))):0)}
 function setGlobalRest(seconds){stopGlobalRest(false);db.restState={deadline:0,total:seconds,startedAt:0};save();updateGlobalRestUI()}
-
-async function requestNotifications(){try{if('Notification' in window&&Notification.permission==='default')await Notification.requestPermission()}catch(e){}}
-
-function notifyRestDone(){
-    navigator.vibrate?.([250,100,250,100,400]);
-    if('Notification' in window&&Notification.permission==='granted'){
-        try{new Notification('Solo Leveling',{body:'⏱️ Descanso concluído! Volte para a próxima série.',icon:'icon.svg',tag:'solo-rest'})}catch(e){}
-    }
-    alert('⏱️ Descanso terminado! Volte ao treino.');
-}
 
 function updateGlobalRestUI(){
     const el=document.getElementById('globalRestClock');
@@ -403,11 +443,7 @@ function startGlobalRest(){
     if(db.restState?.deadline)stopGlobalRest(false);
     const total = db.restState?.total > 0 ? db.restState.total : 60;
     
-    db.restState = {
-        startedAt: Date.now(),
-        deadline: Date.now() + total * 1000,
-        total: total
-    };
+    db.restState = { startedAt: Date.now(), deadline: Date.now() + total * 1000, total: total };
     save();
     
     clearInterval(timerId);
@@ -441,15 +477,12 @@ function stopGlobalRest(commit=true){
 }
 function stopAllRestTimers(){stopGlobalRest(true)}
 
-function setEvolutionMetric(m){
-    currentEvolutionMetric = m;
-    evolutionScreen();
-}
+// --- EVOLUÇÃO E RECORDES ---
+function setEvolutionMetric(m){currentEvolutionMetric = m; evolutionScreen();}
 
 function evolutionScreen(){
     stopTotalTimer();
     screen='evolution';
-    
     const historyExMap = {};
     
     db.history.slice().sort((a,b)=>new Date(a.date)-new Date(b.date)).forEach(record => {
@@ -461,24 +494,18 @@ function evolutionScreen(){
         workoutData.ex.forEach((exInfo, exIndex) => {
             const exName = exInfo[0];
             historyExMap[exName] = historyExMap[exName] || [];
-            
             let maxKg = 0, maxReps = 0, totalExVol = 0, totalExReps = 0;
             
             expandedGroups(exInfo[1]).forEach((row, setIndex) => {
                 const setData = record.data.sets[`${record.workout}-${exIndex}-${setIndex}`] || {};
                 const kg = parseFloat(setData.kg) || 0;
                 const reps = parseInt(setData.reps) || 0;
-                if(kg > maxKg || (kg === maxKg && reps > maxReps)) {
-                    maxKg = kg;
-                    maxReps = reps;
-                }
+                if(kg > maxKg || (kg === maxKg && reps > maxReps)) { maxKg = kg; maxReps = reps; }
                 totalExVol += (kg * reps);
                 totalExReps += reps;
             });
 
-            if(maxKg > 0) {
-                historyExMap[exName].push({ dateStr, fullDate, kg: maxKg, topReps: maxReps, totalReps: totalExReps, volume: totalExVol });
-            }
+            if(maxKg > 0) historyExMap[exName].push({ dateStr, fullDate, kg: maxKg, topReps: maxReps, totalReps: totalExReps, volume: totalExVol });
         });
     });
 
@@ -490,14 +517,12 @@ function evolutionScreen(){
     </div>`;
 
     const exNames = Object.keys(historyExMap);
-
     if(exNames.length === 0){
-        html += `<div class="empty">Nenhum histórico registrado ainda. Complete treinos para ver a evolução aqui!</div>`;
+        html += `<div class="empty">Nenhum histórico registrado ainda.</div>`;
     } else {
         exNames.forEach(exName => {
             const records = historyExMap[exName];
             if(records.length === 0) return;
-            
             const recent = records.slice().reverse().slice(0, 5);
             const latest = recent[0];
             const oldest = recent[recent.length - 1];
@@ -511,7 +536,7 @@ function evolutionScreen(){
             const daysDiff = Math.round((latest.fullDate - oldest.fullDate) / (1000 * 60 * 60 * 24));
             
             let badgeDiff = '';
-            if(recent.length > 1 && daysDiff > 0){
+            if(recent.length > 1 && daysDiff > 0 && currentEvolutionMetric==='kg'){
                 const sign = kgDiff >= 0 ? '+' : '';
                 const color = kgDiff >= 0 ? '#4caf50' : '#f44336';
                 badgeDiff = `<div style="color:${color}; font-weight:bold; margin-top:8px; font-size:12px;">↑ ${sign}${kgDiff}kg de carga max em ${daysDiff} dias</div>`;
@@ -519,19 +544,11 @@ function evolutionScreen(){
 
             html += `<div class="card">
                 <div class="exercise-name" style="margin-bottom:12px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom:6px;">${esc(exName)}</div>
-                
                 <div style="display:flex; flex-direction:column; gap:8px;">
                     ${recent.map(r => {
-                        let val = r.kg;
-                        let label = `${r.kg}kg (Top: ${r.topReps} reps)`;
-                        if(currentEvolutionMetric === 'reps') {
-                            val = r.totalReps;
-                            label = `${r.totalReps} reps totais`;
-                        } else if(currentEvolutionMetric === 'volume') {
-                            val = r.volume;
-                            label = `${r.volume.toLocaleString('pt-BR')}kg vol`;
-                        }
-                        
+                        let val = r.kg, label = `${r.kg}kg (Top: ${r.topReps} reps)`;
+                        if(currentEvolutionMetric === 'reps') { val = r.totalReps; label = `${r.totalReps} reps totais`; } 
+                        else if(currentEvolutionMetric === 'volume') { val = r.volume; label = `${r.volume.toLocaleString('pt-BR')}kg vol`; }
                         const pct = Math.max(12, Math.round((val / maxVal) * 100));
                         
                         return `<div>
@@ -549,7 +566,6 @@ function evolutionScreen(){
             </div>`;
         });
     }
-
     html += `</div>`;
     app.innerHTML = html;
 }
@@ -557,20 +573,16 @@ function evolutionScreen(){
 function recordsScreen(){
     stopTotalTimer();
     screen='records';
-    
     const prMap = {};
     let lastPRBroken = null;
 
-    const sortedHistory = db.history.slice().sort((a,b) => new Date(a.date) - new Date(b.date));
-
-    sortedHistory.forEach(record => {
+    db.history.slice().sort((a,b) => new Date(a.date) - new Date(b.date)).forEach(record => {
         const workoutData = DATA[record.workout];
         if(!workoutData) return;
         const dateStr = new Date(record.date).toLocaleDateString('pt-BR');
 
         workoutData.ex.forEach((exInfo, exIndex) => {
             const exName = exInfo[0];
-            
             expandedGroups(exInfo[1]).forEach((row, setIndex) => {
                 const setData = record.data.sets[`${record.workout}-${exIndex}-${setIndex}`] || {};
                 const kg = parseFloat(setData.kg) || 0;
@@ -579,7 +591,6 @@ function recordsScreen(){
                 if(kg > 0) {
                     const currentBestKg = prMap[exName]?.kg || 0;
                     const currentBestReps = prMap[exName]?.reps || 0;
-
                     if(kg > currentBestKg || (kg === currentBestKg && reps > currentBestReps)){
                         const item = { exName, kg, reps, dateStr };
                         prMap[exName] = item;
@@ -602,9 +613,8 @@ function recordsScreen(){
     }
 
     const prList = Object.values(prMap).sort((a,b) => b.kg - a.kg);
-
     if(prList.length === 0){
-        html += `<div class="empty">Nenhum recorde registrado. Treine duro e registre suas cargas!</div>`;
+        html += `<div class="empty">Nenhum recorde registrado.</div>`;
     } else {
         html += `<div style="display:flex; flex-direction:column; gap:10px;">`;
         prList.forEach(pr => {
@@ -621,7 +631,6 @@ function recordsScreen(){
         });
         html += `</div>`;
     }
-
     html += `</div>`;
     app.innerHTML = html;
 }
@@ -630,41 +639,19 @@ function getWeeklyComparison(){
     const now = new Date();
     const startThisWeek = new Date(now.setDate(now.getDate() - now.getDay())).setHours(0,0,0,0);
     const startLastWeek = new Date(startThisWeek - 7*24*60*60*1000).getTime();
-
-    let thisWeekVol = 0, lastWeekVol = 0;
-    let thisWeekTime = 0, lastWeekTime = 0;
-    let thisWeekCardio = 0, lastWeekCardio = 0;
-    let thisWeekCount = 0, lastWeekCount = 0;
+    let thisWeekVol = 0, lastWeekVol = 0, thisWeekTime = 0, lastWeekTime = 0, thisWeekCardio = 0, lastWeekCardio = 0, thisWeekCount = 0, lastWeekCount = 0;
 
     db.history.forEach(r => {
         const t = new Date(r.date).getTime();
-        const vol = r.totalVolume || 0;
-        const dur = r.duration || 0;
-        const cardio = parseFloat(r.data?.cardio?.time) || 0;
-
+        const vol = r.totalVolume || 0, dur = r.duration || 0, cardio = parseFloat(r.data?.cardio?.time) || 0;
         if(t >= startThisWeek){
-            thisWeekVol += vol;
-            thisWeekTime += dur;
-            thisWeekCardio += cardio;
-            thisWeekCount++;
+            thisWeekVol += vol; thisWeekTime += dur; thisWeekCardio += cardio; thisWeekCount++;
         } else if(t >= startLastWeek && t < startThisWeek){
-            lastWeekVol += vol;
-            lastWeekTime += dur;
-            lastWeekCardio += cardio;
-            lastWeekCount++;
+            lastWeekVol += vol; lastWeekTime += dur; lastWeekCardio += cardio; lastWeekCount++;
         }
     });
-
     const volDiffPct = lastWeekVol > 0 ? (((thisWeekVol - lastWeekVol) / lastWeekVol) * 100).toFixed(1) : 0;
-
-    return {
-        thisWeekTon: (thisWeekVol / 1000).toFixed(1),
-        lastWeekTon: (lastWeekVol / 1000).toFixed(1),
-        volDiffPct,
-        thisWeekTime: formatDuration(thisWeekTime),
-        thisWeekCardio,
-        thisWeekCount
-    };
+    return { thisWeekTon: (thisWeekVol / 1000).toFixed(1), lastWeekTon: (lastWeekVol / 1000).toFixed(1), volDiffPct, thisWeekTime: formatDuration(thisWeekTime), thisWeekCardio, thisWeekCount };
 }
 
 function historyScreen(){
@@ -673,7 +660,6 @@ function historyScreen(){
     const weekly = getWeeklyComparison();
 
     let html = `<div class="app">${header('Histórico & Estatísticas')}
-    
     <div class="card" style="background: rgba(0, 210, 255, 0.05); border: 1px solid rgba(0, 210, 255, 0.2); margin-bottom:20px;">
         <div style="font-weight:bold; font-size:14px; margin-bottom:8px; color:var(--accent,#00d2ff);">🎯 EVOLUÇÃO SEMANAL (VOLUME)</div>
         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; font-size:13px;">
@@ -704,7 +690,6 @@ function historyScreen(){
             </div>`;
         }).join('');
     }
-
     html += `</div>`;
     app.innerHTML = html;
 }
@@ -736,6 +721,7 @@ function viewRecord(id){
     app.innerHTML=html;
 }
 
+// --- CONFIGURAÇÕES E DADOS ---
 function settingsScreen(){
     stopTotalTimer();
     screen='settings';
@@ -746,23 +732,50 @@ function settingsScreen(){
         </label>
         <button class="secondary" style="margin-top:10px;" onclick="updateUserName()">💾 Salvar Nome</button>
     </div>
-    <button class="secondary" onclick="exportData()">⬇️ Exportar histórico (Backup)</button>
+    
+    <div class="card" style="margin-bottom:15px;">
+        <div style="font-weight:bold; margin-bottom:8px;">📦 Backup de Dados</div>
+        <button class="secondary" style="margin-bottom:8px;" onclick="exportData()">⬇️ Exportar backup (JSON)</button>
+        <label class="secondary" style="display:block; text-align:center; cursor:pointer;">
+            ⬆️ Restaurar backup (JSON)
+            <input type="file" accept="application/json" style="display:none;" onchange="importData(event)">
+        </label>
+    </div>
+
     <button class="secondary" onclick="clearDrafts()">🧹 Limpar rascunhos não finalizados</button>
     <button class="secondary danger" onclick="wipeHistory()">Apagar histórico</button></div>`;
 }
 
 function updateUserName(){
     const input = document.getElementById('userNameInput').value.trim();
-    if(input){
-        db.user.name = input;
-        save();
-        toast('Nome atualizado!');
-    }
+    if(input){ db.user.name = input; save(); toast('Nome atualizado!'); }
 }
 
 function clearDrafts(){if(confirm('Apagar todos os treinos que estão apenas como rascunho?')){db.drafts={};save();toast('Rascunhos apagados')}}
 function wipeHistory(){if(confirm('Apagar todo o histórico?')){db.history=[];save();historyScreen()}}
 function exportData(){const b=new Blob([JSON.stringify(db,null,2)],{type:'application/json'}),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download='solo-leveling-historico.json';a.click();URL.revokeObjectURL(u)}
+
+function importData(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const imported = JSON.parse(e.target.result);
+            if (imported.history && imported.user) {
+                db = imported;
+                save();
+                toast('✓ Backup restaurado com sucesso!');
+                home();
+            } else {
+                toast('❌ Arquivo inválido.');
+            }
+        } catch (err) {
+            toast('❌ Erro ao ler backup.');
+        }
+    };
+    reader.readAsText(file);
+}
 
 function pdfScreen(){
     app.innerHTML=`<div class="app">${header('Planilha / PDF')}
@@ -775,4 +788,4 @@ function pdfScreen(){
 function goHome(){stopTotalTimer();clearInterval(timerId);stopAllRestTimers();home()}
 
 home();
-if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js?v=11');
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js?v=12');
