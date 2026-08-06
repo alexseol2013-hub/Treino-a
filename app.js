@@ -55,6 +55,86 @@ let activeChartInstance = null;
 let wakeLock = null;
 const app=document.getElementById('app');
 
+// --- MÓDULO DE EFEITOS SONOROS (WEB AUDIO API) ---
+const SoundFX = {
+    ctx: null,
+    init() {
+        if (!this.ctx) {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (AudioCtx) this.ctx = new AudioCtx();
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+            this.ctx.resume();
+        }
+    },
+    playExp() {
+        try {
+            this.init();
+            if (!this.ctx) return;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(523.25, this.ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(1046.50, this.ctx.currentTime + 0.12);
+            gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.12);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start();
+            osc.stop(this.ctx.currentTime + 0.12);
+        } catch(e) {}
+    },
+    playLevelUp() {
+        try {
+            this.init();
+            if (!this.ctx) return;
+            const notes = [523.25, 659.25, 783.99, 1046.50];
+            notes.forEach((freq, idx) => {
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.value = freq;
+                const startTime = this.ctx.currentTime + (idx * 0.09);
+                gain.gain.setValueAtTime(0.12, startTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.15);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(startTime);
+                osc.stop(startTime + 0.15);
+            });
+        } catch(e) {}
+    },
+    playPR() {
+        try {
+            this.init();
+            if (!this.ctx) return;
+            const notes = [587.33, 739.99, 880.00, 1174.66];
+            notes.forEach((freq, idx) => {
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'square';
+                osc.frequency.value = freq;
+                const startTime = this.ctx.currentTime + (idx * 0.08);
+                gain.gain.setValueAtTime(0.05, startTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.2);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(startTime);
+                osc.stop(startTime + 0.2);
+            });
+        } catch(e) {}
+    }
+};
+
+// --- CÁLCULO DE 1RM ESTIMADO (EPLEY) ---
+function calcular1RM(peso, reps) {
+    const p = parseFloat(peso) || 0;
+    const r = parseInt(reps) || 0;
+    if (p <= 0 || r <= 0) return 0;
+    if (r === 1) return p;
+    return Math.round(p * (1 + (r / 30)));
+}
+
 // Injeta estilos da animação do Badge de PR Monarca no head
 if(!document.getElementById('monarch-pr-styles')){
     const styleEl = document.createElement('style');
@@ -138,18 +218,7 @@ function releaseWakeLock() {
 }
 
 function playBeep() {
-    try {
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(880, audioCtx.currentTime);
-        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.start();
-        osc.stop(audioCtx.currentTime + 1.5);
-    } catch(e) {}
+    SoundFX.playExp();
 }
 
 async function requestNotifications(){try{if('Notification' in window&&Notification.permission==='default')await Notification.requestPermission()}catch(e){}}
@@ -218,8 +287,8 @@ function selectWorkoutScreen(){
 
 function getExercisePR(workoutKey, exIndex) {
     const exName = DATA[workoutKey]?.ex[exIndex]?.[0];
-    if(!exName) return { kg: 0, reps: 0 };
-    let bestKg = 0, bestReps = 0;
+    if(!exName) return { kg: 0, reps: 0, max1RM: 0 };
+    let bestKg = 0, bestReps = 0, max1RM = 0;
     db.history.forEach(r => {
         const wData = DATA[r.workout];
         if(!wData) return;
@@ -229,14 +298,15 @@ function getExercisePR(workoutKey, exIndex) {
                     const setData = r.data?.sets?.[`${r.workout}-${i}-${j}`] || {};
                     const kg = parseFloat(setData.kg) || 0;
                     const reps = parseInt(setData.reps) || 0;
-                    if(kg > bestKg || (kg === bestKg && reps > bestReps)){
-                        bestKg = kg; bestReps = reps;
+                    const c1rm = calcular1RM(kg, reps);
+                    if(c1rm > max1RM){
+                        bestKg = kg; bestReps = reps; max1RM = c1rm;
                     }
                 });
             }
         });
     });
-    return { kg: bestKg, reps: bestReps };
+    return { kg: bestKg, reps: bestReps, max1RM };
 }
 
 function getLastExerciseData(workoutKey, exIndex, setIndex){
@@ -364,9 +434,10 @@ function exerciseHTML(ex,i,d){
         
         const currentKg = parseFloat(x.kg) || 0;
         const currentReps = parseInt(x.reps) || 0;
-        const isPR = currentKg > 0 && (currentKg > pr.kg || (currentKg === pr.kg && currentReps > pr.reps && pr.kg > 0));
+        const current1RM = calcular1RM(currentKg, currentReps);
+        const isPR = currentKg > 0 && current1RM > pr.max1RM && pr.max1RM > 0;
 
-        const badgeHtml = isPR ? `<span class="pr-badge-live">⚡ NOVO PR!</span>` : `<span style="font-size:11px; color:#a855f7;">${prevLabel}</span>`;
+        const badgeHtml = isPR ? `<span class="pr-badge-live">⚡ NOVO PR! (${current1RM}kg 1RM)</span>` : `<span style="font-size:11px; color:#a855f7;">${prevLabel} ${current1RM > 0 ? `· 1RM: ${current1RM}kg` : ''}</span>`;
 
         html+=`<div class="set"><div class="sethead"><div class="settype">${esc(type)} · Série ${r.number}/${r.total}</div>${badgeHtml}</div>
         <div class="fields">
@@ -422,6 +493,17 @@ function toggleSet(i,j){
     }
 
     d.sets[k].done=!d.sets[k].done;
+    
+    if (d.sets[k].done) {
+        const pr = getExercisePR(current, i);
+        const c1rm = calcular1RM(d.sets[k].kg, d.sets[k].reps);
+        if (c1rm > pr.max1RM && pr.max1RM > 0) {
+            SoundFX.playPR();
+        } else {
+            SoundFX.playExp();
+        }
+    }
+
     const ex = DATA[current].ex[i];
     const rows = expandedGroups(ex[1]);
     const allDone = rows.every((r, si) => d.sets[makeKey(i, si)]?.done);
@@ -433,7 +515,13 @@ function toggleSet(i,j){
     toast(d.sets[k].done ? (allDone ? 'Exercício concluído' : 'Série salva') : 'Série desmarcada');
 }
 
-function toggleEx(i){const d=draft();d.exDone[i]=!d.exDone[i];save();renderWorkout()}
+function toggleEx(i){
+    const d=draft();
+    d.exDone[i]=!d.exDone[i];
+    if(d.exDone[i]) SoundFX.playExp();
+    save();
+    renderWorkout();
+}
 
 function startWorkout(){
     const d=draft();
@@ -442,6 +530,7 @@ function startWorkout(){
         save();
         toast('Treino iniciado');
     }
+    SoundFX.init();
     requestWakeLock();
     renderWorkout();
 }
@@ -476,6 +565,7 @@ function finishWorkout(){
     stopAllRestTimers();
     releaseWakeLock();
 
+    SoundFX.playLevelUp();
     showVictoryModal(record);
 }
 
@@ -524,6 +614,7 @@ function updateGlobalRestUI(){
 
 function startGlobalRest(){
     requestNotifications();
+    SoundFX.init();
     if(db.restState?.deadline)stopGlobalRest(false);
     const total = db.restState?.total > 0 ? db.restState.total : 60;
     
@@ -577,9 +668,8 @@ function renderEvolutionChart(historyExMap) {
         if (activeChartInstance) activeChartInstance.destroy();
 
         const dates = [];
-        const datasetsMap = {};
 
-        Object.keys(historyExMap).forEach((exName, idx) => {
+        Object.keys(historyExMap).forEach((exName) => {
             historyExMap[exName].forEach(item => {
                 if (!dates.includes(item.dateStr)) dates.push(item.dateStr);
             });
@@ -773,12 +863,12 @@ function recordsScreen(filterWorkout = 'ALL'){
                 const setData = record.data.sets[`${record.workout}-${exIndex}-${setIndex}`] || {};
                 const kg = parseFloat(setData.kg) || 0;
                 const reps = parseInt(setData.reps) || 0;
+                const est1RM = calcular1RM(kg, reps);
 
                 if(kg > 0) {
-                    const currentBestKg = prMap[key]?.kg || 0;
-                    const currentBestReps = prMap[key]?.reps || 0;
-                    if(kg > currentBestKg || (kg === currentBestKg && reps > currentBestReps)){
-                        const item = { keyName: key, kg, reps, dateStr };
+                    const currentBest1RM = prMap[key]?.est1RM || 0;
+                    if(est1RM > currentBest1RM){
+                        const item = { keyName: key, kg, reps, est1RM, dateStr };
                         prMap[key] = item;
                         lastPRBroken = item;
                     }
@@ -801,11 +891,12 @@ function recordsScreen(filterWorkout = 'ALL'){
             <div style="font-size:11px; color:#00f3ff; text-transform:uppercase; font-weight:bold; letter-spacing:1px;">🏆 ÚLTIMO RECORDE BATIDO</div>
             <div style="font-size:16px; font-weight:bold; margin-top:4px;">${esc(lastPRBroken.keyName)}</div>
             <div style="font-size:22px; font-weight:bold; color:#00f3ff; margin-top:2px;">${lastPRBroken.kg} kg <span style="font-size:14px; color:#fff; font-weight:normal;">× ${lastPRBroken.reps} reps</span></div>
+            <div style="font-size:12px; color:#a855f7; font-weight:bold; margin-top:2px;">1RM Estimado: ${lastPRBroken.est1RM} kg</div>
             <div class="muted" style="margin-top:2px;">Conquistado em ${lastPRBroken.dateStr}</div>
         </div>`;
     }
 
-    const prList = Object.values(prMap).sort((a,b) => b.kg - a.kg);
+    const prList = Object.values(prMap).sort((a,b) => b.est1RM - a.est1RM);
     if(prList.length === 0){
         html += `<div class="empty">Nenhum recorde encontrado.</div>`;
     } else {
@@ -816,9 +907,10 @@ function recordsScreen(filterWorkout = 'ALL'){
                     <div style="font-weight:bold; font-size:14px; line-height:1.2; margin-bottom:4px;">🏆 ${esc(pr.keyName)}</div>
                     <div class="muted" style="font-size:11px;">Alcançado em ${pr.dateStr}</div>
                 </div>
-                <div style="text-align:right; min-width:80px;">
+                <div style="text-align:right; min-width:90px;">
                     <div style="font-size:18px; font-weight:bold; color:#00f3ff;">${pr.kg} kg</div>
                     <div style="font-size:12px; color:#aaa;">${pr.reps} reps</div>
+                    <div style="font-size:11px; color:#a855f7; font-weight:bold;">1RM: ${pr.est1RM} kg</div>
                 </div>
             </div>`;
         });
@@ -904,7 +996,8 @@ function viewRecord(id){
         html+=`<div class="card"><div class="exercise-name">${i+1}. ${esc(ex[0])}</div>`;
         expandedGroups(ex[1]).forEach((row,j)=>{
             const s=row.group,x=r.data.sets[`${r.workout}-${i}-${j}`]||{};
-            html+=`<div class="set"><div class="settype">${esc(s[0])} · Série ${row.number}/${row.total}</div><div class="muted">Planejado: ${esc(s[2])} reps · ${esc(s[3])}</div><div style="margin-top:7px"><b style="color:#00f3ff;">${x.kg||'—'} kg</b> · ${x.reps||'—'} reps ${x.done?'· ✓ concluída':''}</div>${x.obs?`<div class="muted">${esc(x.obs)}</div>`:''}</div>`;
+            const c1rm = calcular1RM(x.kg, x.reps);
+            html+=`<div class="set"><div class="settype">${esc(s[0])} · Série ${row.number}/${row.total}</div><div class="muted">Planejado: ${esc(s[2])} reps · ${esc(s[3])}</div><div style="margin-top:7px"><b style="color:#00f3ff;">${x.kg||'—'} kg</b> · ${x.reps||'—'} reps ${c1rm > 0 ? `· <span style="color:#a855f7;">1RM: ${c1rm}kg</span>` : ''} ${x.done?'· ✓ concluída':''}</div>${x.obs?`<div class="muted">${esc(x.obs)}</div>`:''}</div>`;
         });
         html+=`</div>`;
     });
