@@ -44,7 +44,6 @@ E:{name:'Treino E',desc:'Bíceps, costas e abdômen',mob:'Mobilidade de ombros e
 
 const KEY='solo_leveling_v13';
 
-// CORREÇÃO 1: Leitura segura do localStorage contra dados corrompidos
 let db;
 try {
     db = JSON.parse(localStorage.getItem(KEY)) || null;
@@ -65,7 +64,6 @@ let activeChartInstance = null;
 let wakeLock = null;
 const app=document.getElementById('app');
 
-// --- SISTEMA DE EFEITOS SONOROS ---
 const SoundFX = {
     ctx: null,
     init() {
@@ -99,7 +97,6 @@ const SoundFX = {
     }
 };
 
-// CORREÇÃO 3: Desbloqueio preventivo do AudioContext via interação direta do usuário
 document.addEventListener('touchstart', () => SoundFX.init(), { once: true });
 document.addEventListener('click', () => SoundFX.init(), { once: true });
 
@@ -123,17 +120,17 @@ if(!document.getElementById('monarch-pr-styles')){
     styleEl.id = 'monarch-pr-styles';
     styleEl.textContent = `
         @keyframes prMonarchPulse {
-            0% { transform: scale(1); box-shadow: 0 0 8px rgba(0,243,255,0.4); }
-            50% { transform: scale(1.04); box-shadow: 0 0 16px rgba(0,243,255,0.9); }
-            100% { transform: scale(1); box-shadow: 0 0 8px rgba(0,243,255,0.4); }
+            0% { transform: scale(1); box-shadow: 0 0 8px rgba(168,85,247,0.4); }
+            50% { transform: scale(1.04); box-shadow: 0 0 16px rgba(168,85,247,0.9); }
+            100% { transform: scale(1); box-shadow: 0 0 8px rgba(168,85,247,0.4); }
         }
         .pr-badge-live {
             display: inline-flex;
             align-items: center;
             gap: 4px;
-            background: rgba(0, 243, 255, 0.12);
-            border: 1px solid #00f3ff;
-            color: #00f3ff;
+            background: rgba(168, 85, 247, 0.15);
+            border: 1px solid #a855f7;
+            color: #a855f7;
             padding: 4px 10px;
             border-radius: 6px;
             font-size: 13px;
@@ -142,14 +139,16 @@ if(!document.getElementById('monarch-pr-styles')){
             animation: prMonarchPulse 1.6s infinite ease-in-out;
             text-transform: uppercase;
         }
-        .tech { font-size: 14px !important; font-weight: bold; color: #00f3ff; margin-top: 6px; }
-        .tech-inline { font-size: 13px !important; font-weight: bold; color: #a855f7; margin-top: 4px; }
-        .group-label { font-size: 16px !important; font-weight: bold; color: #00f3ff; margin: 12px 0 6px 0; }
+        .tech { font-size: 14px !important; font-weight: bold; color: #a855f7; margin-top: 6px; }
+        .tech-inline { font-size: 13px !important; font-weight: bold; color: #8a2be2; margin-top: 4px; }
+        .group-label { font-size: 16px !important; font-weight: bold; color: #a855f7; margin: 12px 0 6px 0; }
         .group-label span { font-size: 14px !important; color: #ddd; font-weight: normal; }
-        .total-bottom strong#totalTime { font-size: 28px !important; color: #00f3ff; }
-        .global-rest { padding: 14px 16px !important; }
-        .global-rest strong#globalRestClock { font-size: 26px !important; color: #a855f7; }
-        .global-rest button.mini.start { font-size: 14px !important; padding: 8px 14px !important; }
+        .total-bottom { margin-bottom: 120px !important; border: 2px solid rgba(168,85,247,0.4) !important; padding: 18px !important; }
+        .total-bottom strong#totalTime { font-size: 28px !important; color: #a855f7; }
+        .global-rest { padding: 12px 14px !important; min-height: 80px; }
+        .global-rest strong#globalRestClock { font-size: 28px !important; color: #a855f7; }
+        .global-rest-actions button.mini { font-size: 14px !important; padding: 10px 14px !important; font-weight: bold !important; border-radius: 8px !important; }
+        .global-rest-actions button.mini.start { font-size: 15px !important; padding: 10px 18px !important; background: linear-gradient(135deg, #8a2be2, #a855f7) !important; }
     `;
     document.head.appendChild(styleEl);
 }
@@ -259,7 +258,6 @@ function getUserStats(){
     };
 }
 
-// --- CONQUISTAS DO SISTEMA GAMIFICADO ---
 function getAchievements() {
     const stats = getUserStats();
     const achievements = [
@@ -292,23 +290,23 @@ function achievementsScreen() {
     <div class="card" style="background: linear-gradient(135deg, rgba(20,15,35,0.95), rgba(10,8,20,0.98)); border: 1px solid #8a2be2; margin-bottom: 20px; text-align:center;">
         <div style="font-size: 32px; margin-bottom:4px;">🎖️</div>
         <div style="font-size: 20px; font-weight: bold; color: #fff;">Escala de Ranks do Caçador</div>
-        <div style="font-size: 13px; color: #00f3ff; margin-top: 4px; font-weight:bold;">${unlockedCount} de ${totalCount} Conquistados</div>
+        <div style="font-size: 13px; color: #a855f7; margin-top: 4px; font-weight:bold;">${unlockedCount} de ${totalCount} Conquistados</div>
     </div>
     <div style="display:flex; flex-direction:column; gap:12px;">`;
 
     achievements.forEach(a => {
         const pct = Math.min(100, Math.floor((a.current / a.target) * 100));
-        html += `<div class="card" style="display:flex; gap:12px; align-items:center; border: 1px solid ${a.unlocked ? '#00f3ff' : 'rgba(255,255,255,0.1)'}; background: ${a.unlocked ? 'rgba(0, 243, 255, 0.05)' : 'rgba(15,12,25,0.6)'}">
+        html += `<div class="card" style="display:flex; gap:12px; align-items:center; border: 1px solid ${a.unlocked ? '#a855f7' : 'rgba(255,255,255,0.1)'}; background: ${a.unlocked ? 'rgba(168, 85, 247, 0.08)' : 'rgba(15,12,25,0.6)'}">
             <div style="font-size:36px; opacity:${a.unlocked ? '1' : '0.3'}">${a.icon}</div>
             <div style="flex:1;">
                 <div style="display:flex; justify-content:space-between; align-items:baseline;">
-                    <strong style="font-size:16px; color:${a.unlocked ? '#00f3ff' : '#fff'}">${esc(a.title)}</strong>
-                    ${a.unlocked ? `<span style="font-size:10px; color:#00f3ff; font-weight:bold; border:1px solid #00f3ff; padding:2px 6px; border-radius:4px;">DESBLOQUEADO</span>` : `<span style="font-size:11px; color:#aaa;">${a.current}/${a.target}</span>`}
+                    <strong style="font-size:16px; color:${a.unlocked ? '#a855f7' : '#fff'}">${esc(a.title)}</strong>
+                    ${a.unlocked ? `<span style="font-size:10px; color:#a855f7; font-weight:bold; border:1px solid #a855f7; padding:2px 6px; border-radius:4px;">DESBLOQUEADO</span>` : `<span style="font-size:11px; color:#aaa;">${a.current}/${a.target}</span>`}
                 </div>
                 <div class="muted" style="font-size:12px; margin-top:2px;">${esc(a.desc)}</div>
                 ${!a.unlocked ? `
                 <div style="width:100%; background:rgba(255,255,255,0.08); height:6px; border-radius:3px; overflow:hidden; margin-top:8px;">
-                    <div style="width:${pct}%; background:#a855f7; height:100%;"></div>
+                    <div style="width:${pct}%; background:#8a2be2; height:100%;"></div>
                 </div>` : ''}
             </div>
         </div>`;
@@ -330,11 +328,11 @@ async function requestNotifications(){try{if('Notification' in window&&Notificat
 function showRestAlertModal() {
     const div = document.createElement('div');
     div.innerHTML = `
-        <div style="background:#0b0a12; padding:35px 20px; border-radius:16px; border:2px solid #8a2be2; text-align:center; width:90%; max-width:350px; box-shadow: 0 0 35px rgba(138, 43, 226, 0.6);">
+        <div style="background:#0b0a12; padding:35px 20px; border-radius:16px; border:2px solid #a855f7; text-align:center; width:90%; max-width:350px; box-shadow: 0 0 35px rgba(168, 85, 247, 0.6);">
             <div style="font-size:50px; margin-bottom:10px;">💪</div>
             <h2 style="color:#a855f7; margin:0 0 10px 0; font-size:22px; font-weight:800;">FIM DO DESCANSO!</h2>
             <p style="color:#e0e0e0; margin-bottom:25px; font-size:15px; line-height:1.4;">Hora de subir de nível. Volte para a próxima série!</p>
-            <button class="primary" style="width:100%; padding:14px; font-size:16px; font-weight:bold; background: linear-gradient(135deg, #6366f1, #a855f7);" onclick="this.parentElement.parentElement.remove()">ESTOU PRONTO</button>
+            <button class="primary" style="width:100%; padding:14px; font-size:16px; font-weight:bold; background: linear-gradient(135deg, #8a2be2, #a855f7);" onclick="this.parentElement.parentElement.remove()">ESTOU PRONTO</button>
         </div>
     `;
     div.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:99999; display:flex; align-items:center; justify-content:center; animation: fadeIn 0.3s;';
@@ -357,27 +355,27 @@ function home(){
     const { unlockedCount, totalCount } = getAchievements();
     
     app.innerHTML=`<div class="app">${header('Painel do Caçador', false)}
-    <div class="card" style="background: linear-gradient(135deg, rgba(20,15,35,0.95), rgba(10,8,20,0.98)); border: 1px solid #8a2be2; box-shadow: 0 0 25px rgba(138, 43, 226, 0.25); border-radius: 12px; padding: 16px; margin-bottom: 20px;">
+    <div class="card" style="background: linear-gradient(135deg, rgba(20,15,35,0.95), rgba(10,8,20,0.98)); border: 1px solid #a855f7; box-shadow: 0 0 25px rgba(168, 85, 247, 0.25); border-radius: 12px; padding: 16px; margin-bottom: 20px;">
         <div style="font-size: 13px; color: #a855f7; text-transform: uppercase; letter-spacing: 1.5px; font-weight:bold;">${esc(stats.rank)}</div>
         <div style="font-size: 22px; font-weight: bold; color: #fff; margin-top: 2px;">${getGreeting()}, ${esc(db.user.name)}</div>
         <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 15px;">
             <span style="font-size: 18px; font-weight: bold; color: #a855f7;">Nível ${stats.level}</span>
-            <span style="font-size: 13px; color: #00f3ff; font-weight:bold;">XP: ${stats.currentLevelXP} / ${stats.nextLevelReq}</span>
+            <span style="font-size: 13px; color: #a855f7; font-weight:bold;">XP: ${stats.currentLevelXP} / ${stats.nextLevelReq}</span>
         </div>
-        <div style="width: 100%; background: rgba(255,255,255,0.08); height: 10px; border-radius: 5px; overflow: hidden; margin-top: 6px; border: 1px solid rgba(138,43,226,0.3);">
-            <div style="width: ${stats.progressPct}%; background: linear-gradient(90deg, #6366f1, #a855f7, #00f3ff); height: 100%; transition: width 0.3s;"></div>
+        <div style="width: 100%; background: rgba(255,255,255,0.08); height: 10px; border-radius: 5px; overflow: hidden; margin-top: 6px; border: 1px solid rgba(168,85,247,0.3);">
+            <div style="width: ${stats.progressPct}%; background: linear-gradient(90deg, #6366f1, #8a2be2, #a855f7); height: 100%; transition: width 0.3s;"></div>
         </div>
         <div style="display: flex; justify-content: space-between; margin-top: 16px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.08); font-size: 13px;">
             <div><span style="color: #888;">Treinos Concluídos:</span> <strong style="color:#fff;">${stats.totalWorkouts}</strong></div>
-            <div><span style="color: #888;">Último Treino:</span> <strong style="color:#00f3ff;">${stats.lastWorkoutDateStr}</strong></div>
+            <div><span style="color: #888;">Último Treino:</span> <strong style="color:#a855f7;">${stats.lastWorkoutDateStr}</strong></div>
         </div>
     </div>
     <div style="display: flex; flex-direction: column; gap: 10px;">
-        <button class="primary" style="padding: 18px; font-size: 18px; font-weight: bold; text-align: left; background: linear-gradient(135deg, #6366f1, #8a2be2);" onclick="selectWorkoutScreen()">⚔️ Treinar Agora</button>
+        <button class="primary" style="padding: 18px; font-size: 18px; font-weight: bold; text-align: left; background: linear-gradient(135deg, #8a2be2, #a855f7);" onclick="selectWorkoutScreen()">⚔️ Treinar Agora</button>
         <button class="secondary" style="text-align: left; padding: 14px;" onclick="historyScreen()">📈 Histórico e Estatísticas</button>
         <button class="secondary" style="text-align: left; padding: 14px;" onclick="evolutionScreen(currentEvolutionFilter)">📊 Evolução de Cargas & Volume</button>
         <button class="secondary" style="text-align: left; padding: 14px;" onclick="recordsScreen(currentRecordsFilter)">🏆 Recordes Pessoais (PRs)</button>
-        <button class="secondary" style="text-align: left; padding: 14px; display:flex; justify-content:space-between; align-items:center;" onclick="achievementsScreen()"><span>🎖️ Conquistas & Ranks</span><span style="font-size:12px; color:#00f3ff; font-weight:bold;">${unlockedCount}/${totalCount}</span></button>
+        <button class="secondary" style="text-align: left; padding: 14px; display:flex; justify-content:space-between; align-items:center;" onclick="achievementsScreen()"><span>🎖️ Conquistas & Ranks</span><span style="font-size:12px; color:#a855f7; font-weight:bold;">${unlockedCount}/${totalCount}</span></button>
         <button class="secondary" style="text-align: left; padding: 14px;" onclick="settingsScreen()">⚙️ Configurações</button>
         <button class="secondary" style="text-align: left; padding: 14px;" onclick="pdfScreen()">📄 Planilha / PDF</button>
     </div>
@@ -427,7 +425,7 @@ function getLastExerciseData(workoutKey, exIndex, setIndex){
     return null;
 }
 
-function draft(){db.drafts[current]??={sets:{},exDone:{},cardio:{},startedAt:null};return db.drafts[current]}
+function draft(){db.drafts[current]??={sets:{},exDone:{},cardio:{},startedAt:null, scheduledRestTotal:0};return db.drafts[current]}
 function openWorkout(k){current=k;screen='workout';draft();save();renderWorkout()}
 function parseQty(q){const m=String(q).match(/(\d+)\s*[–-]\s*(\d+)/);if(m)return Number(m[2]);const n=String(q).match(/\d+/);return n?Number(n[0]):1}
 function expandedGroups(groups){let out=[];groups.forEach((g,gi)=>{const qty=parseQty(g[1]);for(let n=1;n<=qty;n++)out.push({group:g,groupIndex:gi,number:n,total:qty});});return out}
@@ -458,7 +456,7 @@ function renderWorkout(){
     <div class="start-panel" style="padding:16px;">
         <div><strong>${started?'Treino em andamento':'Treino não iniciado'}</strong>
         <div class="muted" style="font-size:13px;">${started?'O tempo está contando.':'Quando estiver pronto, toque em iniciar.'}</div></div>
-        <button class="primary start-workout" style="font-size:16px; padding:12px 20px;" onclick="startWorkout()" ${started?'disabled':''}>${started?'✓ Iniciado':'▶ Iniciar'}</button>
+        <button class="primary start-workout" style="font-size:16px; padding:12px 20px; background: linear-gradient(135deg, #8a2be2, #a855f7);" onclick="startWorkout()" ${started?'disabled':''}>${started?'✓ Iniciado':'▶ Iniciar'}</button>
     </div>
     
     ${v.ex.map((ex,i)=>exerciseHTML(ex,i,d)).join('')}
@@ -470,20 +468,22 @@ function renderWorkout(){
         <button class="secondary" onclick="saveCardio()">💾 Salvar cardio</button>
     </div>
     
-    <button class="finish" onclick="finishWorkout()" ${started?'':'disabled'}>✓ Finalizar e salvar treino</button>
+    <button class="finish" style="background: linear-gradient(135deg, #8a2be2, #a855f7);" onclick="finishWorkout()" ${started?'':'disabled'}>✓ Finalizar e salvar treino</button>
     <button class="secondary danger" onclick="cancelWorkout()">Sair e manter rascunho</button>
     
-    <div class="total-bottom" style="padding:18px; border:2px solid rgba(0,243,255,0.3);">
-        <div class="muted" style="font-size:12px; font-weight:bold; letter-spacing:1px;">TEMPO TOTAL DO TREINO</div>
+    <div class="total-bottom">
+        <div class="muted" style="font-size:12px; font-weight:bold; letter-spacing:1px; color:#a855f7;">TEMPO TOTAL DO TREINO</div>
         <strong id="totalTime">${started?formatDuration(Math.floor((Date.now()-d.startedAt)/1000)):'00:00'}</strong>
-        <div style="margin-top:8px; font-size:14px; color:#aaa;">Volume Total: <strong style="color:#00f3ff; font-size:16px;">${metrics.totalVolume.toLocaleString('pt-BR')} kg</strong></div>
+        <div style="margin-top:8px; font-size:14px; color:#aaa;">Volume Total: <strong style="color:#a855f7; font-size:16px;">${metrics.totalVolume.toLocaleString('pt-BR')} kg</strong></div>
         <div style="font-size:14px; color:#aaa;">Carga Somada Bruta: <strong style="color:#a855f7; font-size:16px;">${metrics.totalWeightRaw.toLocaleString('pt-BR')} kg</strong></div>
-        <div class="muted" id="restTotalLabel" style="margin-top:6px; font-size:13px;">Descanso registrado: ${formatDuration(d.restTotal||0)}</div>
+        <div class="muted" id="restTotalLabel" style="margin-top:8px; font-size:13px; font-weight:bold; color:#e0e0e0; background:rgba(168,85,247,0.1); padding:8px; border-radius:6px; border:1px solid rgba(168,85,247,0.3);">
+            Descanso realizado: <span style="color:#a855f7;">${formatDuration(restTotalForDraft())}</span> / <span style="color:#00f3ff;">${formatDuration(d.scheduledRestTotal||0)}</span> programado
+        </div>
     </div></div>
     
     <div class="global-rest" id="globalRest">
-        <div><small style="font-size:11px; font-weight:bold;">TEMPORIZADOR DE DESCANSO</small><br><strong id="globalRestClock">00:00</strong></div>
-        <div class="global-rest-actions">
+        <div><small style="font-size:11px; font-weight:bold; color:#aaa;">TEMPORIZADOR DE DESCANSO</small><br><strong id="globalRestClock">00:00</strong></div>
+        <div class="global-rest-actions" style="display:flex; gap:6px; align-items:center;">
             <button class="mini" onclick="setGlobalRest(45)">45s</button>
             <button class="mini" onclick="setGlobalRest(60)">1m</button>
             <button class="mini" onclick="setGlobalRest(120)">2m</button>
@@ -518,7 +518,7 @@ function exerciseHTML(ex,i,d){
             <div class="exercise-name" style="flex:1; font-size:18px !important; font-weight:bold; color:#fff;">${i+1}. ${esc(name)}</div>
             <button class="mini" type="button" style="margin-left:8px; font-size:12px; padding:6px 10px;" onclick="swapExercise(${i})">🔄 Trocar</button>
         </div>
-        ${tech?`<div class="tech" style="font-size:14px; font-weight:bold; color:#00f3ff; margin-top:6px;">⚡ ${esc(tech)}</div>`:''}`;
+        ${tech?`<div class="tech" style="font-size:14px; font-weight:bold; color:#a855f7; margin-top:6px;">⚡ ${esc(tech)}</div>`:''}`;
     
     rows.forEach((r,si)=>{
         const [type,qty,reps,rest]=r.group;
@@ -545,7 +545,7 @@ function exerciseHTML(ex,i,d){
 
         const badgeHtml = isPR ? `<span class="pr-badge-live">⚡ NOVO PR!</span>` : `<span style="font-size:12px; color:#a855f7; font-weight:bold;">${prevLabel}</span>`;
 
-        html+=`<div class="set" style="padding:12px 0; border-bottom:1px solid rgba(255,255,255,0.06);"><div class="sethead"><div class="settype" style="font-size:15px; font-weight:bold; color:#00f3ff;">${esc(type)} · Série ${r.number}/${r.total}</div>${badgeHtml}</div>
+        html+=`<div class="set" style="padding:12px 0; border-bottom:1px solid rgba(255,255,255,0.06);"><div class="sethead"><div class="settype" style="font-size:15px; font-weight:bold; color:#a855f7;">${esc(type)} · Série ${r.number}/${r.total}</div>${badgeHtml}</div>
         <div class="fields" style="margin-top:8px;">
             <label style="font-size:12px; font-weight:bold; color:#aaa;">REPS FEITAS
                 <div style="display:flex; gap:4px; align-items:center; margin-top:4px;">
@@ -647,6 +647,7 @@ function finishWorkout(){
         name:v.name,
         duration:Math.floor((Date.now()-d.startedAt)/1000),
         restDuration:d.restTotal,
+        scheduledRestTotal:d.scheduledRestTotal||0,
         totalVolume:metrics.totalVolume,
         totalWeightRaw:metrics.totalWeightRaw,
         data:JSON.parse(JSON.stringify(d))
@@ -675,25 +676,28 @@ function showVictoryModal(record){
         <div class="muted">Você completou o ${esc(record.name)}</div>
 
         <div class="card" style="border: 1px solid #8a2be2; background: rgba(138, 43, 226, 0.08); margin-top:20px; text-align:left; box-shadow: 0 0 20px rgba(138,43,226,0.3);">
-            <div style="font-size:14px; font-weight:bold; color:#00f3ff;">+${xpGained} EXP ADICIONADOS</div>
-            <div style="font-size:12px; color:#a855f7; margin-top:4px; font-weight:bold;">TÍTULO: ${esc(stats.rank)}</div>
+            <div style="font-size:14px; font-weight:bold; color:#a855f7;">+${xpGained} EXP ADICIONADOS</div>
+            <div style="font-size:12px; color:#8a2be2; margin-top:4px; font-weight:bold;">TÍTULO: ${esc(stats.rank)}</div>
             <div style="font-size:18px; font-weight:bold; margin-top:4px;">Nível ${stats.level} <span style="font-size:12px; color:#aaa;">(${stats.progressPct}%)</span></div>
             <div style="width: 100%; background: rgba(255,255,255,0.1); height: 10px; border-radius: 5px; overflow: hidden; margin-top: 8px;">
-                <div style="width: ${stats.progressPct}%; background: linear-gradient(90deg, #6366f1, #a855f7, #00f3ff); height: 100%;"></div>
+                <div style="width: ${stats.progressPct}%; background: linear-gradient(90deg, #6366f1, #8a2be2, #a855f7); height: 100%;"></div>
             </div>
             
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:15px; font-size:13px; border-top:1px solid rgba(255,255,255,0.08); padding-top:10px;">
-                <div>Volume Total:<br><strong style="color:#00f3ff;">${record.totalVolume.toLocaleString('pt-BR')} kg</strong></div>
+                <div>Volume Total:<br><strong style="color:#a855f7;">${record.totalVolume.toLocaleString('pt-BR')} kg</strong></div>
                 <div>Tempo:<br><strong style="color:#fff;">${formatDuration(record.duration)}</strong></div>
             </div>
+            <div style="margin-top:10px; font-size:12px; color:#aaa;">
+                Descanso Realizado: <strong style="color:#a855f7;">${formatDuration(record.restDuration||0)}</strong> / <strong style="color:#00f3ff;">${formatDuration(record.scheduledRestTotal||0)}</strong> Programado
+            </div>
         </div>
-        <button class="primary" style="margin-top:25px; width:100%; padding:16px; font-weight:bold; background: linear-gradient(135deg, #6366f1, #a855f7);" onclick="home()">VOLTAR AO PAINEL PRINCIPAL</button>
+        <button class="primary" style="margin-top:25px; width:100%; padding:16px; font-weight:bold; background: linear-gradient(135deg, #8a2be2, #a855f7);" onclick="home()">VOLTAR AO PAINEL PRINCIPAL</button>
     </div>`;
 }
 
 function cancelWorkout(){if(confirm('Sair agora? O rascunho ficará salvo para continuar depois.')){stopTotalTimer();if(timerId)clearInterval(timerId);stopAllRestTimers();releaseWakeLock();home()}}
 
-function startTotalTimer(){stopTotalTimer();totalTimerId=setInterval(()=>{const d=draft();const x=document.getElementById('totalTime');if(x&&d.startedAt)x.textContent=formatDuration(Math.floor((Date.now()-d.startedAt)/1000));const y=document.getElementById('restTotalLabel');if(y)y.textContent='Descanso registrado: '+formatDuration(restTotalForDraft())},1000)}
+function startTotalTimer(){stopTotalTimer();totalTimerId=setInterval(()=>{const d=draft();const x=document.getElementById('totalTime');if(x&&d.startedAt)x.textContent=formatDuration(Math.floor((Date.now()-d.startedAt)/1000));const y=document.getElementById('restTotalLabel');if(y)y.innerHTML=`Descanso realizado: <span style="color:#a855f7;">${formatDuration(restTotalForDraft())}</span> / <span style="color:#00f3ff;">${formatDuration(d.scheduledRestTotal||0)}</span> programado`},1000)}
 function stopTotalTimer(){if(totalTimerId)clearInterval(totalTimerId);totalTimerId=null}
 function formatDuration(n){n=Math.max(0,Math.floor(n));const h=Math.floor(n/3600),m=Math.floor((n%3600)/60),s=n%60;if(h)return `${h}h ${m}min`;if(m)return `${m}min ${String(s).padStart(2,'0')}s`;return `00:${String(s).padStart(2,'0')}`}
 function fmt(n){n=Math.max(0,Math.floor(n));return String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0')}
@@ -708,7 +712,6 @@ function updateGlobalRestUI(){
     el.textContent=fmt(left);
 }
 
-// CORREÇÃO 4: Prevenção de múltiplos intervalos e acúmulo de timers
 function startGlobalRest(){
     requestNotifications();
     SoundFX.init();
@@ -716,6 +719,10 @@ function startGlobalRest(){
     if(db.restState?.deadline)stopGlobalRest(false);
     
     const total = db.restState?.total > 0 ? db.restState.total : 60;
+    
+    const d = draft();
+    d.scheduledRestTotal = (d.scheduledRestTotal || 0) + total;
+
     db.restState = { startedAt: Date.now(), deadline: Date.now() + total * 1000, total: total };
     save();
     
@@ -774,7 +781,7 @@ function renderEvolutionChart(historyExMap) {
 
         dates.sort();
 
-        const colors = ['#00f3ff', '#a855f7', '#6366f1', '#ec4899', '#10b981'];
+        const colors = ['#a855f7', '#8a2be2', '#6366f1', '#ec4899', '#00f3ff'];
         let colorIdx = 0;
 
         const datasets = Object.keys(historyExMap).map(exName => {
@@ -810,7 +817,7 @@ function renderEvolutionChart(historyExMap) {
                 maintainAspectRatio: false,
                 plugins: {
                     legend: { labels: { color: '#e0e0e0', font: { size: 10 } } },
-                    tooltip: { backgroundColor: '#0b0a12', titleColor: '#00f3ff', bodyColor: '#fff', borderColor: '#8a2be2', borderWidth: 1 }
+                    tooltip: { backgroundColor: '#0b0a12', titleColor: '#a855f7', bodyColor: '#fff', borderColor: '#8a2be2', borderWidth: 1 }
                 },
                 scales: {
                     x: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } },
@@ -898,7 +905,7 @@ function evolutionScreen(filterWorkout = 'ALL'){
             let badgeDiff = '';
             if(recent.length > 1 && daysDiff > 0 && currentEvolutionMetric==='kg'){
                 const sign = kgDiff >= 0 ? '+' : '';
-                const color = kgDiff >= 0 ? '#00f3ff' : '#ef4444';
+                const color = kgDiff >= 0 ? '#a855f7' : '#ef4444';
                 if(kgDiff !== 0) {
                     badgeDiff = `<div style="color:${color}; font-weight:bold; margin-top:8px; font-size:12px;">${kgDiff >= 0 ? '↑' : '↓'} ${sign}${kgDiff}kg de carga max em ${daysDiff} dias</div>`;
                 } else {
@@ -921,7 +928,7 @@ function evolutionScreen(filterWorkout = 'ALL'){
                                 <span><strong>${label}</strong></span>
                             </div>
                             <div style="width:100%; background:rgba(255,255,255,0.08); height:8px; border-radius:4px; overflow:hidden;">
-                                <div style="width:${pct}%; background:linear-gradient(90deg, #6366f1, #a855f7, #00f3ff); height:100%;"></div>
+                                <div style="width:${pct}%; background:linear-gradient(90deg, #6366f1, #8a2be2, #a855f7); height:100%;"></div>
                             </div>
                         </div>`;
                     }).join('')}
@@ -984,10 +991,10 @@ function recordsScreen(filterWorkout = 'ALL'){
     </div>`;
 
     if(lastPRBroken && filterWorkout === 'ALL' && !searchFilterQuery){
-        html += `<div class="card" style="border: 1px solid #00f3ff; background: rgba(0, 243, 255, 0.05); margin-bottom: 20px; box-shadow: 0 0 15px rgba(0,243,255,0.2);">
-            <div style="font-size:11px; color:#00f3ff; text-transform:uppercase; font-weight:bold; letter-spacing:1px;">🏆 ÚLTIMO RECORDE BATIDO</div>
+        html += `<div class="card" style="border: 1px solid #a855f7; background: rgba(168, 85, 247, 0.08); margin-bottom: 20px; box-shadow: 0 0 15px rgba(168,85,247,0.2);">
+            <div style="font-size:11px; color:#a855f7; text-transform:uppercase; font-weight:bold; letter-spacing:1px;">🏆 ÚLTIMO RECORDE BATIDO</div>
             <div style="font-size:16px; font-weight:bold; margin-top:4px;">${esc(lastPRBroken.keyName)}</div>
-            <div style="font-size:22px; font-weight:bold; color:#00f3ff; margin-top:2px;">${lastPRBroken.kg} kg <span style="font-size:14px; color:#fff; font-weight:normal;">× ${lastPRBroken.reps} reps</span></div>
+            <div style="font-size:22px; font-weight:bold; color:#a855f7; margin-top:2px;">${lastPRBroken.kg} kg <span style="font-size:14px; color:#fff; font-weight:normal;">× ${lastPRBroken.reps} reps</span></div>
             <div class="muted" style="margin-top:2px;">Conquistado em ${lastPRBroken.dateStr}</div>
         </div>`;
     }
@@ -1004,7 +1011,7 @@ function recordsScreen(filterWorkout = 'ALL'){
                     <div class="muted" style="font-size:11px;">Alcançado em ${pr.dateStr}</div>
                 </div>
                 <div style="text-align:right; min-width:90px;">
-                    <div style="font-size:18px; font-weight:bold; color:#00f3ff;">${pr.kg} kg</div>
+                    <div style="font-size:18px; font-weight:bold; color:#a855f7;">${pr.kg} kg</div>
                     <div style="font-size:12px; color:#aaa;">${pr.reps} reps</div>
                 </div>
             </div>`;
@@ -1044,9 +1051,9 @@ function historyScreen(){
         <div style="font-weight:bold; font-size:14px; margin-bottom:8px; color:#a855f7;">🎯 EVOLUÇÃO SEMANAL (VOLUME)</div>
         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; font-size:13px;">
             <div><span class="muted">Semana passada:</span><br><strong style="color:#fff;">${weekly.lastWeekTon} toneladas</strong></div>
-            <div><span class="muted">Esta semana:</span><br><strong style="color:#00f3ff;">${weekly.thisWeekTon} toneladas</strong></div>
+            <div><span class="muted">Esta semana:</span><br><strong style="color:#a855f7;">${weekly.thisWeekTon} toneladas</strong></div>
         </div>
-        <div style="margin-top:8px; font-size:12px; font-weight:bold; color:${weekly.volDiffPct>=0?'#00f3ff':'#ef4444'};">
+        <div style="margin-top:8px; font-size:12px; font-weight:bold; color:${weekly.volDiffPct>=0?'#a855f7':'#ef4444'};">
             ${weekly.volDiffPct>=0?'↑ +':'↓ '}${weekly.volDiffPct}% de volume esta semana
         </div>
         <div style="margin-top:10px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.08); font-size:12px; display:flex; justify-content:space-between;">
@@ -1085,13 +1092,13 @@ function deleteRecord(id){
 
 function viewRecord(id){
     const r=db.history.find(x=>x.id===id),v=DATA[r.workout];
-    let html=`<div class="app">${header('Registro do treino')}<div class="muted">${new Date(r.date).toLocaleString('pt-BR')} · Duração ${formatDuration(r.duration)}<br>Volume: ${(r.totalVolume||0).toLocaleString('pt-BR')} kg · Carga Bruta: ${(r.totalWeightRaw||0).toLocaleString('pt-BR')} kg</div>`;
+    let html=`<div class="app">${header('Registro do treino')}<div class="muted">${new Date(r.date).toLocaleString('pt-BR')} · Duração ${formatDuration(r.duration)}<br>Volume: ${(r.totalVolume||0).toLocaleString('pt-BR')} kg · Carga Bruta: ${(r.totalWeightRaw||0).toLocaleString('pt-BR')} kg<br>Descanso: ${formatDuration(r.restDuration||0)} de ${formatDuration(r.scheduledRestTotal||0)} programado</div>`;
     
     v.ex.forEach((ex,i)=>{
         html+=`<div class="card"><div class="exercise-name">${i+1}. ${esc(ex[0])}</div>`;
         expandedGroups(ex[1]).forEach((row,j)=>{
             const s=row.group,x=r.data.sets[`${r.workout}-${i}-${j}`]||{};
-            html+=`<div class="set"><div class="settype">${esc(s[0])} · Série ${row.number}/${row.total}</div><div class="muted">Planejado: ${esc(s[2])} reps · ${esc(s[3])}</div><div style="margin-top:7px"><b style="color:#00f3ff;">${x.kg||'—'} kg</b> · ${x.reps||'—'} reps ${x.done?'· ✓ concluída':''}</div>${x.obs?`<div class="muted">${esc(x.obs)}</div>`:''}</div>`;
+            html+=`<div class="set"><div class="settype">${esc(s[0])} · Série ${row.number}/${row.total}</div><div class="muted">Planejado: ${esc(s[2])} reps · ${esc(s[3])}</div><div style="margin-top:7px"><b style="color:#a855f7;">${x.kg||'—'} kg</b> · ${x.reps||'—'} reps ${x.done?'· ✓ concluída':''}</div>${x.obs?`<div class="muted">${esc(x.obs)}</div>`:''}</div>`;
         });
         html+=`</div>`;
     });
@@ -1101,7 +1108,6 @@ function viewRecord(id){
     app.innerHTML=html;
 }
 
-// --- TELA DE CONFIGURAÇÕES E EDIÇÃO DE EXERCÍCIOS ---
 function editWorkoutExercises(workoutKey) {
     const workout = DATA[workoutKey];
     let html = `<div class="app">${header(`Editar: ${workout.name}`)}
@@ -1114,7 +1120,7 @@ function editWorkoutExercises(workoutKey) {
         </div>`;
     });
 
-    html += `<button class="primary" style="margin-top:15px; padding:14px;" onclick="saveEditedExercises('${workoutKey}')">💾 Salvar Alterações</button>
+    html += `<button class="primary" style="margin-top:15px; padding:14px; background: linear-gradient(135deg, #8a2be2, #a855f7);" onclick="saveEditedExercises('${workoutKey}')">💾 Salvar Alterações</button>
     <button class="secondary" style="margin-top:8px;" onclick="settingsScreen()">Cancelar</button>
     </div>`;
 
@@ -1143,7 +1149,7 @@ function settingsScreen(){
     </div>
 
     <div class="card" style="margin-bottom:15px;">
-        <div style="font-weight:bold; margin-bottom:8px; color:#00f3ff;">✏️ Editar Exercícios dos Treinos</div>
+        <div style="font-weight:bold; margin-bottom:8px; color:#a855f7;">✏️ Editar Exercícios dos Treinos</div>
         <div style="display:flex; flex-direction:column; gap:6px;">
             ${Object.keys(DATA).map(k => `<button class="secondary" style="text-align:left; padding:10px;" onclick="editWorkoutExercises('${k}')">Editar ${DATA[k].name}</button>`).join('')}
         </div>
