@@ -46,10 +46,10 @@ const KEY='solo_leveling_v11';
 let db=JSON.parse(localStorage.getItem(KEY)||'null')||{history:[],drafts:{},user:{name:'Alexsandro'},restState:{deadline:0,total:0,startedAt:0}};
 let screen='home',current=null,timerId=null,totalTimerId=null;
 
-// Filtros Globais para as abas de Evolução e Recordes
 let currentEvolutionMetric = 'kg'; 
 let currentEvolutionFilter = 'ALL';
 let currentRecordsFilter = 'ALL';
+let searchFilterQuery = '';
 
 let wakeLock = null;
 const app=document.getElementById('app');
@@ -92,7 +92,6 @@ function getUserStats(){
     return { level, currentLevelXP, totalWorkouts, lastWorkoutDateStr: getRelativeDate(lastWorkout) };
 }
 
-// --- INTEGRAÇÕES DE HARDWARE (Áudio e Tela) ---
 async function requestWakeLock() {
     try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {}
 }
@@ -111,7 +110,7 @@ function playBeep() {
         osc.connect(gain);
         gain.connect(audioCtx.destination);
         osc.start();
-        osc.stop(audioCtx.currentTime + 1.5); // Bipe longo (1.5 segundos)
+        osc.stop(audioCtx.currentTime + 1.5);
     } catch(e) {}
 }
 
@@ -120,42 +119,41 @@ async function requestNotifications(){try{if('Notification' in window&&Notificat
 function showRestAlertModal() {
     const div = document.createElement('div');
     div.innerHTML = `
-        <div style="background:#151520; padding:40px 20px; border-radius:16px; border:2px solid #00d2ff; text-align:center; width:90%; max-width:350px; box-shadow: 0 0 30px rgba(0, 210, 255, 0.4);">
-            <div style="font-size:50px; margin-bottom:10px;">⏰</div>
-            <h2 style="color:#00d2ff; margin:0 0 10px 0; font-size:24px;">TEMPO ESGOTADO!</h2>
-            <p style="color:#fff; margin-bottom:25px; font-size:16px;">Hora de voltar para a próxima série. Arrebenta!</p>
+        <div style="background:#0b0a12; padding:35px 20px; border-radius:16px; border:2px solid #8a2be2; text-align:center; width:90%; max-width:350px; box-shadow: 0 0 30px rgba(138, 43, 226, 0.5);">
+            <div style="font-size:50px; margin-bottom:10px;">💪</div>
+            <h2 style="color:#a855f7; margin:0 0 10px 0; font-size:22px; font-weight:800;">FIM DO DESCANSO!</h2>
+            <p style="color:#e0e0e0; margin-bottom:25px; font-size:15px; line-height:1.4;">Hora de subir de nível. Volte para a próxima série!</p>
             <button class="primary" style="width:100%; padding:14px; font-size:16px; font-weight:bold;" onclick="this.parentElement.parentElement.remove()">ESTOU PRONTO</button>
         </div>
     `;
-    div.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:99999; display:flex; align-items:center; justify-content:center; animation: fadeIn 0.3s;';
+    div.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.88); z-index:99999; display:flex; align-items:center; justify-content:center; animation: fadeIn 0.3s;';
     document.body.appendChild(div);
 }
 
 function notifyRestDone(){
     playBeep();
-    navigator.vibrate?.([500,200,500,200,800]); // Vibração mais forte
+    navigator.vibrate?.([500,200,500,200,800]);
     if('Notification' in window && Notification.permission==='granted'){
-        try{ new Notification('Solo Leveling',{body:'⏱️ Descanso concluído! Volte para a próxima série.',icon:'icon.svg',tag:'solo-rest'}); }catch(e){}
+        try{ new Notification('Solo Leveling',{body:'⏱️ Descanso concluído! Hora de subir de nível.',icon:'icon.svg',tag:'solo-rest'}); }catch(e){}
     }
-    showRestAlertModal(); // Alerta na tela
+    showRestAlertModal();
 }
 
-// --- TELAS E LÓGICA CORE ---
 function home(){
     stopTotalTimer();
     screen='home';
     const stats = getUserStats();
     
     app.innerHTML=`<div class="app">${header('Painel do Caçador', false)}
-    <div class="card" style="background: linear-gradient(135deg, rgba(20,20,35,0.9), rgba(10,10,20,0.95)); border: 1px solid var(--accent, #00d2ff); box-shadow: 0 0 15px rgba(0,210,255,0.15); border-radius: 12px; padding: 16px; margin-bottom: 20px;">
-        <div style="font-size: 13px; color: #88a; text-transform: uppercase; letter-spacing: 1px;">SISTEMA SOLO LEVELING</div>
+    <div class="card" style="background: linear-gradient(135deg, rgba(20,15,35,0.9), rgba(10,8,20,0.95)); border: 1px solid var(--accent, #a855f7); box-shadow: 0 0 20px rgba(138, 43, 226, 0.2); border-radius: 12px; padding: 16px; margin-bottom: 20px;">
+        <div style="font-size: 11px; color: #a855f7; text-transform: uppercase; letter-spacing: 1.5px; font-weight:bold;">SISTEMA SOLO LEVELING</div>
         <div style="font-size: 20px; font-weight: bold; color: #fff; margin-top: 2px;">${getGreeting()}, ${esc(db.user.name)}</div>
         <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 15px;">
-            <span style="font-size: 16px; font-weight: bold; color: var(--accent, #00d2ff);">Nível ${stats.level}</span>
+            <span style="font-size: 16px; font-weight: bold; color: var(--accent, #a855f7);">Nível ${stats.level}</span>
             <span style="font-size: 12px; color: #aaa;">Experiência: ${stats.currentLevelXP}%</span>
         </div>
-        <div style="width: 100%; background: rgba(255,255,255,0.1); height: 10px; border-radius: 5px; overflow: hidden; margin-top: 6px;">
-            <div style="width: ${stats.currentLevelXP}%; background: linear-gradient(90deg, #0072ff, #00d2ff); height: 100%; transition: width 0.3s;"></div>
+        <div style="width: 100%; background: rgba(255,255,255,0.08); height: 10px; border-radius: 5px; overflow: hidden; margin-top: 6px;">
+            <div style="width: ${stats.currentLevelXP}%; background: linear-gradient(90deg, #6366f1, #a855f7); height: 100%; transition: width 0.3s;"></div>
         </div>
         <div style="display: flex; justify-content: space-between; margin-top: 16px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.08); font-size: 13px;">
             <div><span style="color: #888;">Treinos Concluídos:</span> <strong>${stats.totalWorkouts}</strong></div>
@@ -241,7 +239,7 @@ function renderWorkout(){
     <div class="total-bottom">
         <div class="muted">TEMPO TOTAL DO TREINO</div>
         <strong id="totalTime">${started?formatDuration(Math.floor((Date.now()-d.startedAt)/1000)):'00:00'}</strong>
-        <div style="margin-top:6px; font-size:12px; color:#aaa;">Volume ($\text{Carga} \times \text{Reps}$): <strong style="color:var(--accent,#00d2ff);">${metrics.totalVolume.toLocaleString('pt-BR')} kg</strong></div>
+        <div style="margin-top:6px; font-size:12px; color:#aaa;">Volume Total: <strong style="color:var(--accent,#a855f7);">${metrics.totalVolume.toLocaleString('pt-BR')} kg</strong></div>
         <div style="font-size:12px; color:#aaa;">Carga Somada Bruta: <strong>${metrics.totalWeightRaw.toLocaleString('pt-BR')} kg</strong></div>
         <div class="muted" id="restTotalLabel" style="margin-top:4px;">Descanso registrado: ${formatDuration(d.restTotal||0)}</div>
     </div></div>
@@ -278,7 +276,7 @@ function exerciseHTML(ex,i,d){
     let lastGroup=-1;
     
     let html=`<div class="card">
-        <div class="exercise-head" style="display:flex; justify-content:space-between; align-items:center;">
+        <div class="exercise-head" style="display:flex; justify-space-between; align-items:center;">
             <div class="exercise-name" style="flex:1;">${i+1}. ${esc(name)}</div>
             <button class="mini" type="button" style="margin-left:8px;" onclick="swapExercise(${i})">🔄 Trocar</button>
         </div>
@@ -301,7 +299,7 @@ function exerciseHTML(ex,i,d){
         
         const prev = getLastExerciseData(current, i, si);
         const prevLabel = prev ? `Anterior: ${prev.kg}kg × ${prev.reps}` : 'Primeira vez';
-        const volumeBadge = `<span style="font-size:11px; color:#00d2ff; margin-left: auto;">${prevLabel}</span>`;
+        const volumeBadge = `<span style="font-size:11px; color:#a855f7; margin-left: auto;">${prevLabel}</span>`;
 
         html+=`<div class="set"><div class="sethead"><div class="settype">${esc(type)} · Série ${r.number}/${r.total}</div>${volumeBadge}</div>
         <div class="fields">
@@ -421,14 +419,14 @@ function showVictoryModal(record){
 
     app.innerHTML = `<div class="app" style="text-align:center; padding-top:40px;">
         <div style="font-size: 50px;">⚡</div>
-        <h1 style="color:#ffd700; font-size:26px; text-transform:uppercase; margin-top:10px;">MISSÃO CONCLUÍDA!</h1>
+        <h1 style="color:#a855f7; font-size:26px; text-transform:uppercase; margin-top:10px;">MISSÃO CONCLUÍDA!</h1>
         <div class="muted">Você completou o ${esc(record.name)}</div>
 
-        <div class="card" style="border: 1px solid var(--accent, #00d2ff); background: rgba(0, 210, 255, 0.05); margin-top:20px; text-align:left;">
-            <div style="font-size:14px; font-weight:bold; color:var(--accent,#00d2ff);">+${xpGained} EXP ADICIONADOS</div>
+        <div class="card" style="border: 1px solid var(--accent, #a855f7); background: rgba(168, 85, 247, 0.05); margin-top:20px; text-align:left;">
+            <div style="font-size:14px; font-weight:bold; color:var(--accent,#a855f7);">+${xpGained} EXP ADICIONADOS</div>
             <div style="font-size:18px; font-weight:bold; margin-top:6px;">Nível ${stats.level} <span style="font-size:12px; color:#aaa;">(${stats.currentLevelXP}%)</span></div>
             <div style="width: 100%; background: rgba(255,255,255,0.1); height: 10px; border-radius: 5px; overflow: hidden; margin-top: 8px;">
-                <div style="width: ${stats.currentLevelXP}%; background: linear-gradient(90deg, #0072ff, #00d2ff); height: 100%;"></div>
+                <div style="width: ${stats.currentLevelXP}%; background: linear-gradient(90deg, #6366f1, #a855f7); height: 100%;"></div>
             </div>
             
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:15px; font-size:13px; border-top:1px solid rgba(255,255,255,0.08); padding-top:10px;">
@@ -442,7 +440,6 @@ function showVictoryModal(record){
 
 function cancelWorkout(){if(confirm('Sair agora? O rascunho ficará salvo para continuar depois.')){stopTotalTimer();clearInterval(timerId);stopAllRestTimers();releaseWakeLock();home()}}
 
-// --- CRONÔMETROS ---
 function startTotalTimer(){stopTotalTimer();totalTimerId=setInterval(()=>{const d=draft();const x=document.getElementById('totalTime');if(x&&d.startedAt)x.textContent=formatDuration(Math.floor((Date.now()-d.startedAt)/1000));const y=document.getElementById('restTotalLabel');if(y)y.textContent='Descanso registrado: '+formatDuration(restTotalForDraft())},1000)}
 function stopTotalTimer(){if(totalTimerId)clearInterval(totalTimerId);totalTimerId=null}
 function formatDuration(n){n=Math.max(0,Math.floor(n));const h=Math.floor(n/3600),m=Math.floor((n%3600)/60),s=n%60;if(h)return `${h}h ${m}min`;if(m)return `${m}min ${String(s).padStart(2,'0')}s`;return `00:${String(s).padStart(2,'0')}`}
@@ -497,8 +494,13 @@ function stopGlobalRest(commit=true){
 }
 function stopAllRestTimers(){stopGlobalRest(true)}
 
-// --- EVOLUÇÃO E RECORDES ---
 function setEvolutionMetric(m){currentEvolutionMetric = m; evolutionScreen(currentEvolutionFilter);}
+
+function updateSearchFilter(val) {
+    searchFilterQuery = val.toLowerCase();
+    if (screen === 'evolution') evolutionScreen(currentEvolutionFilter);
+    else if (screen === 'records') recordsScreen(currentRecordsFilter);
+}
 
 function evolutionScreen(filterWorkout = 'ALL'){
     stopTotalTimer();
@@ -507,7 +509,7 @@ function evolutionScreen(filterWorkout = 'ALL'){
     const historyExMap = {};
     
     db.history.slice().sort((a,b)=>new Date(a.date)-new Date(b.date)).forEach(record => {
-        if(filterWorkout !== 'ALL' && record.workout !== filterWorkout) return; // Filtro de Treino
+        if(filterWorkout !== 'ALL' && record.workout !== filterWorkout) return;
 
         const workoutData = DATA[record.workout];
         if(!workoutData) return;
@@ -517,6 +519,8 @@ function evolutionScreen(filterWorkout = 'ALL'){
         workoutData.ex.forEach((exInfo, exIndex) => {
             const exName = exInfo[0];
             const key = filterWorkout === 'ALL' ? `${exName} (Treino ${record.workout})` : exName;
+
+            if (searchFilterQuery && !key.toLowerCase().includes(searchFilterQuery)) return;
 
             historyExMap[key] = historyExMap[key] || [];
             let maxKg = 0, maxReps = 0, totalExVol = 0, totalExReps = 0;
@@ -535,6 +539,9 @@ function evolutionScreen(filterWorkout = 'ALL'){
     });
 
     let html = `<div class="app">${header('Evolução de Cargas & Volume')}
+    <div style="margin-bottom: 10px;">
+        <input type="text" placeholder="🔍 Pesquisar exercício..." value="${esc(searchFilterQuery)}" oninput="updateSearchFilter(this.value)" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(168,85,247,0.3); background: rgba(0,0,0,0.3); color: #fff; font-size: 14px;">
+    </div>
     <div style="display:flex; overflow-x:auto; gap:6px; margin-bottom:12px; padding-bottom:5px;">
         <button class="${filterWorkout==='ALL'?'primary':'secondary'}" style="white-space:nowrap; padding:6px 12px; font-size:13px;" onclick="evolutionScreen('ALL')">Todos</button>
         ${Object.keys(DATA).map(k => `<button class="${filterWorkout===k?'primary':'secondary'}" style="white-space:nowrap; padding:6px 12px; font-size:13px;" onclick="evolutionScreen('${k}')">Treino ${k}</button>`).join('')}
@@ -548,7 +555,7 @@ function evolutionScreen(filterWorkout = 'ALL'){
 
     const exNames = Object.keys(historyExMap);
     if(exNames.length === 0){
-        html += `<div class="empty">Nenhum histórico registrado para este filtro.</div>`;
+        html += `<div class="empty">Nenhum histórico encontrado.</div>`;
     } else {
         exNames.forEach(keyName => {
             const records = historyExMap[keyName];
@@ -568,7 +575,7 @@ function evolutionScreen(filterWorkout = 'ALL'){
             let badgeDiff = '';
             if(recent.length > 1 && daysDiff > 0 && currentEvolutionMetric==='kg'){
                 const sign = kgDiff >= 0 ? '+' : '';
-                const color = kgDiff >= 0 ? '#4caf50' : '#f44336';
+                const color = kgDiff >= 0 ? '#10b981' : '#ef4444';
                 if(kgDiff !== 0) {
                     badgeDiff = `<div style="color:${color}; font-weight:bold; margin-top:8px; font-size:12px;">${kgDiff >= 0 ? '↑' : '↓'} ${sign}${kgDiff}kg de carga max em ${daysDiff} dias</div>`;
                 } else {
@@ -587,11 +594,11 @@ function evolutionScreen(filterWorkout = 'ALL'){
                         
                         return `<div>
                             <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:2px;">
-                                <span style="font-weight:bold; color:var(--accent,#00d2ff);">${r.dateStr}</span>
+                                <span style="font-weight:bold; color:var(--accent,#a855f7);">${r.dateStr}</span>
                                 <span><strong>${label}</strong></span>
                             </div>
                             <div style="width:100%; background:rgba(255,255,255,0.08); height:8px; border-radius:4px; overflow:hidden;">
-                                <div style="width:${pct}%; background:linear-gradient(90deg, #00d2ff, #0072ff); height:100%;"></div>
+                                <div style="width:${pct}%; background:linear-gradient(90deg, #6366f1, #a855f7); height:100%;"></div>
                             </div>
                         </div>`;
                     }).join('')}
@@ -622,6 +629,8 @@ function recordsScreen(filterWorkout = 'ALL'){
             const exName = exInfo[0];
             const key = filterWorkout === 'ALL' ? `${exName} (Treino ${record.workout})` : exName;
 
+            if (searchFilterQuery && !key.toLowerCase().includes(searchFilterQuery)) return;
+
             expandedGroups(exInfo[1]).forEach((row, setIndex) => {
                 const setData = record.data.sets[`${record.workout}-${exIndex}-${setIndex}`] || {};
                 const kg = parseFloat(setData.kg) || 0;
@@ -641,23 +650,26 @@ function recordsScreen(filterWorkout = 'ALL'){
     });
 
     let html = `<div class="app">${header('Recordes Pessoais (PRs)')}
+    <div style="margin-bottom: 10px;">
+        <input type="text" placeholder="🔍 Pesquisar exercício..." value="${esc(searchFilterQuery)}" oninput="updateSearchFilter(this.value)" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(168,85,247,0.3); background: rgba(0,0,0,0.3); color: #fff; font-size: 14px;">
+    </div>
     <div style="display:flex; overflow-x:auto; gap:6px; margin-bottom:15px; padding-bottom:5px;">
         <button class="${filterWorkout==='ALL'?'primary':'secondary'}" style="white-space:nowrap; padding:6px 12px; font-size:13px;" onclick="recordsScreen('ALL')">Todos</button>
         ${Object.keys(DATA).map(k => `<button class="${filterWorkout===k?'primary':'secondary'}" style="white-space:nowrap; padding:6px 12px; font-size:13px;" onclick="recordsScreen('${k}')">Treino ${k}</button>`).join('')}
     </div>`;
 
-    if(lastPRBroken && filterWorkout === 'ALL'){
-        html += `<div class="card" style="border: 1px solid #ffd700; background: rgba(255, 215, 0, 0.08); margin-bottom: 20px;">
-            <div style="font-size:11px; color:#ffd700; text-transform:uppercase; font-weight:bold;">🏆 ÚLTIMO RECORDE BATIDO</div>
+    if(lastPRBroken && filterWorkout === 'ALL' && !searchFilterQuery){
+        html += `<div class="card" style="border: 1px solid #a855f7; background: rgba(168, 85, 247, 0.08); margin-bottom: 20px;">
+            <div style="font-size:11px; color:#a855f7; text-transform:uppercase; font-weight:bold;">🏆 ÚLTIMO RECORDE BATIDO</div>
             <div style="font-size:16px; font-weight:bold; margin-top:4px;">${esc(lastPRBroken.keyName)}</div>
-            <div style="font-size:22px; font-weight:bold; color:#ffd700; margin-top:2px;">${lastPRBroken.kg} kg <span style="font-size:14px; color:#fff; font-weight:normal;">× ${lastPRBroken.reps} reps</span></div>
+            <div style="font-size:22px; font-weight:bold; color:#a855f7; margin-top:2px;">${lastPRBroken.kg} kg <span style="font-size:14px; color:#fff; font-weight:normal;">× ${lastPRBroken.reps} reps</span></div>
             <div class="muted" style="margin-top:2px;">Conquistado em ${lastPRBroken.dateStr}</div>
         </div>`;
     }
 
     const prList = Object.values(prMap).sort((a,b) => b.kg - a.kg);
     if(prList.length === 0){
-        html += `<div class="empty">Nenhum recorde registrado para este filtro.</div>`;
+        html += `<div class="empty">Nenhum recorde encontrado.</div>`;
     } else {
         html += `<div style="display:flex; flex-direction:column; gap:10px;">`;
         prList.forEach(pr => {
@@ -667,7 +679,7 @@ function recordsScreen(filterWorkout = 'ALL'){
                     <div class="muted" style="font-size:11px;">Alcançado em ${pr.dateStr}</div>
                 </div>
                 <div style="text-align:right; min-width:80px;">
-                    <div style="font-size:18px; font-weight:bold; color:var(--accent,#00d2ff);">${pr.kg} kg</div>
+                    <div style="font-size:18px; font-weight:bold; color:var(--accent,#a855f7);">${pr.kg} kg</div>
                     <div style="font-size:12px; color:#aaa;">${pr.reps} reps</div>
                 </div>
             </div>`;
@@ -703,13 +715,13 @@ function historyScreen(){
     const weekly = getWeeklyComparison();
 
     let html = `<div class="app">${header('Histórico & Estatísticas')}
-    <div class="card" style="background: rgba(0, 210, 255, 0.05); border: 1px solid rgba(0, 210, 255, 0.2); margin-bottom:20px;">
-        <div style="font-weight:bold; font-size:14px; margin-bottom:8px; color:var(--accent,#00d2ff);">🎯 EVOLUÇÃO SEMANAL (VOLUME)</div>
+    <div class="card" style="background: rgba(168, 85, 247, 0.05); border: 1px solid rgba(168, 85, 247, 0.2); margin-bottom:20px;">
+        <div style="font-weight:bold; font-size:14px; margin-bottom:8px; color:var(--accent,#a855f7);">🎯 EVOLUÇÃO SEMANAL (VOLUME)</div>
         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; font-size:13px;">
             <div><span class="muted">Semana passada:</span><br><strong>${weekly.lastWeekTon} toneladas</strong></div>
             <div><span class="muted">Esta semana:</span><br><strong>${weekly.thisWeekTon} toneladas</strong></div>
         </div>
-        <div style="margin-top:8px; font-size:12px; font-weight:bold; color:${weekly.volDiffPct>=0?'#4caf50':'#f44336'};">
+        <div style="margin-top:8px; font-size:12px; font-weight:bold; color:${weekly.volDiffPct>=0?'#10b981':'#ef4444'};">
             ${weekly.volDiffPct>=0?'↑ +':'↓ '}${weekly.volDiffPct}% de volume esta semana
         </div>
         <div style="margin-top:10px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.08); font-size:12px; display:flex; justify-content:space-between;">
@@ -756,7 +768,7 @@ function viewRecord(id){
             const s=row.group,x=r.data.sets[`${r.workout}-${i}-${j}`]||{};
             html+=`<div class="set"><div class="settype">${esc(s[0])} · Série ${row.number}/${row.total}</div><div class="muted">Planejado: ${esc(s[2])} reps · ${esc(s[3])}</div><div style="margin-top:7px"><b>${x.kg||'—'} kg</b> · ${x.reps||'—'} reps ${x.done?'· ✓ concluída':''}</div>${x.obs?`<div class="muted">${esc(x.obs)}</div>`:''}</div>`;
         });
-        html+=`</div>`; // ERRO VISUAL CORRIGIDO AQUI!
+        html+=`</div>`;
     });
     
     const c=r.data.cardio||{};
@@ -764,7 +776,6 @@ function viewRecord(id){
     app.innerHTML=html;
 }
 
-// --- CONFIGURAÇÕES E DADOS ---
 function settingsScreen(){
     stopTotalTimer();
     screen='settings';
