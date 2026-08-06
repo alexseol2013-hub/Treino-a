@@ -42,7 +42,7 @@ E:{name:'Treino E',desc:'Bíceps, costas e abdômen',mob:'Mobilidade de ombros e
 ['Abdominal supra na prancha declinada',[['Trabalho','3','RM','45 s']], '3x RM (máximo de repetições possíveis) · intervalo 1 min'] ]}
 };
 
-const KEY='solo_leveling_v12';
+const KEY='solo_leveling_v13';
 let db=JSON.parse(localStorage.getItem(KEY)||'null')||{history:[],drafts:{},user:{name:'Alexsandro'},restState:{deadline:0,total:0,startedAt:0}};
 let screen='home',current=null,timerId=null,totalTimerId=null;
 
@@ -120,14 +120,22 @@ if(!document.getElementById('monarch-pr-styles')){
             background: rgba(0, 243, 255, 0.12);
             border: 1px solid #00f3ff;
             color: #00f3ff;
-            padding: 3px 8px;
+            padding: 4px 10px;
             border-radius: 6px;
-            font-size: 11px;
+            font-size: 13px;
             font-weight: 800;
             letter-spacing: 0.5px;
             animation: prMonarchPulse 1.6s infinite ease-in-out;
             text-transform: uppercase;
         }
+        .tech { font-size: 14px !important; font-weight: bold; color: #00f3ff; margin-top: 6px; }
+        .tech-inline { font-size: 13px !important; font-weight: bold; color: #a855f7; margin-top: 4px; }
+        .group-label { font-size: 16px !important; font-weight: bold; color: #00f3ff; margin: 12px 0 6px 0; }
+        .group-label span { font-size: 14px !important; color: #ddd; font-weight: normal; }
+        .total-bottom strong#totalTime { font-size: 28px !important; color: #00f3ff; }
+        .global-rest { padding: 14px 16px !important; }
+        .global-rest strong#globalRestClock { font-size: 26px !important; color: #a855f7; }
+        .global-rest button.mini.start { font-size: 14px !important; padding: 8px 14px !important; }
     `;
     document.head.appendChild(styleEl);
 }
@@ -164,21 +172,21 @@ function getRelativeDate(isoString){
     return `Há ${diffDays} dias`;
 }
 
-// --- FÓRMULA EXPONENCIAL DE XP & DESTAQUE DE NÍVEL ---
 function getRankTitle(level) {
-    if (level >= 200) return "Monarca das Sombras";
-    if (level >= 150) return "Caçador Rank Nacional";
-    if (level >= 100) return "Caçador Rank S";
-    if (level >= 80)  return "Caçador Rank A";
-    if (level >= 60)  return "Caçador Rank B";
-    if (level >= 40)  return "Caçador Rank C";
-    if (level >= 20)  return "Caçador Rank D";
-    if (level >= 10)  return "Caçador Rank E";
-    return "Primeiro Despertar";
+    if (level >= 1000) return "Ser Absoluto";
+    if (level >= 500)  return "Monarca";
+    if (level >= 250)  return "Rank Nacional";
+    if (level >= 100)  return "Rank S";
+    if (level >= 75)   return "Rank A";
+    if (level >= 50)   return "Rank B";
+    if (level >= 30)   return "Rank C";
+    if (level >= 15)   return "Rank D";
+    if (level >= 5)    return "Rank E";
+    return "Iniciante";
 }
 
 function getRequiredXPForLevel(lvl) {
-    return Math.floor(100 * Math.pow(lvl, 2.35));
+    return Math.floor(100 * Math.pow(lvl, 2.1));
 }
 
 function getUserStats(){
@@ -186,15 +194,16 @@ function getUserStats(){
     let totalXP = 0;
     let totalVolume = 0;
     let totalCardioMin = 0;
+    let totalCardioSessions = 0;
     let maxKgGlobal = 0;
 
     db.history.forEach(r => {
         const cardioMin = parseFloat(r.data?.cardio?.time) || 0;
+        if (cardioMin > 0) totalCardioSessions++;
         const vol = (r.totalVolume || 0);
         totalVolume += vol;
         totalCardioMin += cardioMin;
 
-        // Base de XP: 200 XP por treino + 1 XP por min de cardio + 1 XP a cada 50kg levantados
         totalXP += 200 + Math.floor(cardioMin) + Math.floor(vol / 50);
 
         const wData = DATA[r.workout];
@@ -209,7 +218,6 @@ function getUserStats(){
         }
     });
 
-    // Nível calculado com progressão exponencial rígida
     let level = 1;
     let accumulatedXP = totalXP;
     while (accumulatedXP >= getRequiredXPForLevel(level)) {
@@ -219,7 +227,7 @@ function getUserStats(){
 
     const nextLevelReq = getRequiredXPForLevel(level);
     const progressPct = Math.min(100, Math.floor((accumulatedXP / nextLevelReq) * 100));
-    const rank = getRankTitle(level);
+    const rank = getRankTitle(totalWorkouts);
     const lastWorkout = db.history.length ? db.history[db.history.length - 1].date : null;
 
     return { 
@@ -229,6 +237,7 @@ function getUserStats(){
         nextLevelReq, 
         progressPct, 
         totalWorkouts, 
+        totalCardioSessions,
         lastWorkoutDateStr: getRelativeDate(lastWorkout), 
         totalVolume, 
         totalCardioMin, 
@@ -236,20 +245,19 @@ function getUserStats(){
     };
 }
 
-// --- CONQUISTAS DO SISTEMA ---
+// --- CONQUISTAS DO SISTEMA GAMIFICADO ---
 function getAchievements() {
     const stats = getUserStats();
     const achievements = [
-        { id: 'first_step', title: 'Primeiro Despertar', desc: 'Conclua seu 1º treino no sistema.', icon: '🗡️', current: stats.totalWorkouts, target: 1 },
-        { id: 'workout_5', title: 'Caçador Rank E', desc: 'Conclua 5 treinos.', icon: '🛡️', current: stats.totalWorkouts, target: 5 },
-        { id: 'workout_20', title: 'Caçador Rank C', desc: 'Conclua 20 treinos.', icon: '⚔️', current: stats.totalWorkouts, target: 20 },
-        { id: 'workout_50', title: 'Caçador Rank S', desc: 'Conclua 50 treinos.', icon: '👑', current: stats.totalWorkouts, target: 50 },
-        { id: 'vol_10t', title: 'Mestre da Força I', desc: 'Levante 10 Toneladas em volume total acumulado.', icon: '🏋️', current: Math.floor(stats.totalVolume / 1000), target: 10, unit: 't' },
-        { id: 'vol_100t', title: 'Monarca das Cargas', desc: 'Levante 100 Toneladas em volume acumulado.', icon: '🔥', current: Math.floor(stats.totalVolume / 1000), target: 100, unit: 't' },
-        { id: 'cardio_60', title: 'Maratonista das Sombras', desc: 'Acumule 60 minutos de cardio.', icon: '🏃', current: Math.floor(stats.totalCardioMin), target: 60, unit: 'min' },
-        { id: 'kg_50', title: 'Quebrador de Limites I', desc: 'Alcance 50 kg de carga em um exercício.', icon: '⚡', current: stats.maxKgGlobal, target: 50, unit: 'kg' },
-        { id: 'kg_100', title: 'Força do Monarca', desc: 'Alcance 100 kg de carga em um exercício.', icon: '💥', current: stats.maxKgGlobal, target: 100, unit: 'kg' },
-        { id: 'lvl_10', title: 'Caçador Qualificado', desc: 'Alcance o Nível 10 de Caçador.', icon: '🌌', current: stats.level, target: 10 }
+        { id: 'rank_e', title: 'Rank E', desc: 'Alcance 5 treinos concluídos.', icon: '🛡️', current: stats.totalWorkouts, target: 5 },
+        { id: 'rank_d', title: 'Rank D', desc: 'Alcance 15 treinos concluídos + 5 cardios.', icon: '⚔️', current: stats.totalWorkouts + stats.totalCardioSessions, target: 20 },
+        { id: 'rank_c', title: 'Rank C', desc: 'Alcance 30 treinos concluídos + 10 cardios.', icon: '⚡', current: stats.totalWorkouts + stats.totalCardioSessions, target: 40 },
+        { id: 'rank_b', title: 'Rank B', desc: 'Alcance 50 treinos concluídos + 20 cardios.', icon: '🔥', current: stats.totalWorkouts + stats.totalCardioSessions, target: 70 },
+        { id: 'rank_a', title: 'Rank A', desc: 'Alcance 75 treinos concluídos + 35 cardios.', icon: '🔮', current: stats.totalWorkouts + stats.totalCardioSessions, target: 110 },
+        { id: 'rank_s', title: 'Rank S', desc: 'Alcance 100 treinos concluídos + 50 cardios.', icon: '👑', current: stats.totalWorkouts + stats.totalCardioSessions, target: 150 },
+        { id: 'rank_nacional', title: 'Rank Nacional', desc: 'Alcance 250 treinos concluídos + 100 cardios.', icon: '🌟', current: stats.totalWorkouts + stats.totalCardioSessions, target: 350 },
+        { id: 'rank_monarca', title: 'Rank Monarca', desc: 'Alcance 500 treinos concluídos + 200 cardios.', icon: '☠️', current: stats.totalWorkouts + stats.totalCardioSessions, target: 700 },
+        { id: 'rank_absoluto', title: 'Rank Ser Absoluto', desc: 'Alcance 1000 treinos concluídos + 500 cardios.', icon: '🌌', current: stats.totalWorkouts + stats.totalCardioSessions, target: 1500 }
     ];
 
     let unlockedCount = 0;
@@ -266,23 +274,22 @@ function achievementsScreen() {
     screen = 'achievements';
     const { achievements, unlockedCount, totalCount } = getAchievements();
 
-    let html = `<div class="app">${header('Conquistas & Títulos')}
+    let html = `<div class="app">${header('Conquistas & Ranks')}
     <div class="card" style="background: linear-gradient(135deg, rgba(20,15,35,0.95), rgba(10,8,20,0.98)); border: 1px solid #8a2be2; margin-bottom: 20px; text-align:center;">
         <div style="font-size: 32px; margin-bottom:4px;">🎖️</div>
-        <div style="font-size: 20px; font-weight: bold; color: #fff;">Conquistas do Caçador</div>
-        <div style="font-size: 13px; color: #00f3ff; margin-top: 4px; font-weight:bold;">${unlockedCount} de ${totalCount} Desbloqueadas</div>
+        <div style="font-size: 20px; font-weight: bold; color: #fff;">Escala de Ranks do Caçador</div>
+        <div style="font-size: 13px; color: #00f3ff; margin-top: 4px; font-weight:bold;">${unlockedCount} de ${totalCount} Conquistados</div>
     </div>
     <div style="display:flex; flex-direction:column; gap:12px;">`;
 
     achievements.forEach(a => {
         const pct = Math.min(100, Math.floor((a.current / a.target) * 100));
-        const unit = a.unit || '';
         html += `<div class="card" style="display:flex; gap:12px; align-items:center; border: 1px solid ${a.unlocked ? '#00f3ff' : 'rgba(255,255,255,0.1)'}; background: ${a.unlocked ? 'rgba(0, 243, 255, 0.05)' : 'rgba(15,12,25,0.6)'}">
             <div style="font-size:36px; opacity:${a.unlocked ? '1' : '0.3'}">${a.icon}</div>
             <div style="flex:1;">
                 <div style="display:flex; justify-content:space-between; align-items:baseline;">
-                    <strong style="font-size:15px; color:${a.unlocked ? '#00f3ff' : '#fff'}">${esc(a.title)}</strong>
-                    ${a.unlocked ? `<span style="font-size:10px; color:#00f3ff; font-weight:bold; border:1px solid #00f3ff; padding:2px 6px; border-radius:4px;">DESBLOQUEADO</span>` : `<span style="font-size:11px; color:#aaa;">${a.current}/${a.target}${unit}</span>`}
+                    <strong style="font-size:16px; color:${a.unlocked ? '#00f3ff' : '#fff'}">${esc(a.title)}</strong>
+                    ${a.unlocked ? `<span style="font-size:10px; color:#00f3ff; font-weight:bold; border:1px solid #00f3ff; padding:2px 6px; border-radius:4px;">DESBLOQUEADO</span>` : `<span style="font-size:11px; color:#aaa;">${a.current}/${a.target}</span>`}
                 </div>
                 <div class="muted" style="font-size:12px; margin-top:2px;">${esc(a.desc)}</div>
                 ${!a.unlocked ? `
@@ -337,11 +344,11 @@ function home(){
     
     app.innerHTML=`<div class="app">${header('Painel do Caçador', false)}
     <div class="card" style="background: linear-gradient(135deg, rgba(20,15,35,0.95), rgba(10,8,20,0.98)); border: 1px solid #8a2be2; box-shadow: 0 0 25px rgba(138, 43, 226, 0.25); border-radius: 12px; padding: 16px; margin-bottom: 20px;">
-        <div style="font-size: 11px; color: #a855f7; text-transform: uppercase; letter-spacing: 1.5px; font-weight:bold;">${esc(stats.rank)}</div>
-        <div style="font-size: 20px; font-weight: bold; color: #fff; margin-top: 2px;">${getGreeting()}, ${esc(db.user.name)}</div>
+        <div style="font-size: 13px; color: #a855f7; text-transform: uppercase; letter-spacing: 1.5px; font-weight:bold;">${esc(stats.rank)}</div>
+        <div style="font-size: 22px; font-weight: bold; color: #fff; margin-top: 2px;">${getGreeting()}, ${esc(db.user.name)}</div>
         <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 15px;">
-            <span style="font-size: 16px; font-weight: bold; color: #a855f7;">Nível ${stats.level}</span>
-            <span style="font-size: 12px; color: #00f3ff; font-weight:bold;">XP: ${stats.currentLevelXP} / ${stats.nextLevelReq}</span>
+            <span style="font-size: 18px; font-weight: bold; color: #a855f7;">Nível ${stats.level}</span>
+            <span style="font-size: 13px; color: #00f3ff; font-weight:bold;">XP: ${stats.currentLevelXP} / ${stats.nextLevelReq}</span>
         </div>
         <div style="width: 100%; background: rgba(255,255,255,0.08); height: 10px; border-radius: 5px; overflow: hidden; margin-top: 6px; border: 1px solid rgba(138,43,226,0.3);">
             <div style="width: ${stats.progressPct}%; background: linear-gradient(90deg, #6366f1, #a855f7, #00f3ff); height: 100%; transition: width 0.3s;"></div>
@@ -352,11 +359,11 @@ function home(){
         </div>
     </div>
     <div style="display: flex; flex-direction: column; gap: 10px;">
-        <button class="primary" style="padding: 16px; font-size: 16px; font-weight: bold; text-align: left; background: linear-gradient(135deg, #6366f1, #8a2be2);" onclick="selectWorkoutScreen()">⚔️ Treinar Agora</button>
+        <button class="primary" style="padding: 18px; font-size: 18px; font-weight: bold; text-align: left; background: linear-gradient(135deg, #6366f1, #8a2be2);" onclick="selectWorkoutScreen()">⚔️ Treinar Agora</button>
         <button class="secondary" style="text-align: left; padding: 14px;" onclick="historyScreen()">📈 Histórico e Estatísticas</button>
         <button class="secondary" style="text-align: left; padding: 14px;" onclick="evolutionScreen(currentEvolutionFilter)">📊 Evolução de Cargas & Volume</button>
         <button class="secondary" style="text-align: left; padding: 14px;" onclick="recordsScreen(currentRecordsFilter)">🏆 Recordes Pessoais (PRs)</button>
-        <button class="secondary" style="text-align: left; padding: 14px; display:flex; justify-content:space-between; align-items:center;" onclick="achievementsScreen()"><span>🎖️ Conquistas & Títulos</span><span style="font-size:12px; color:#00f3ff; font-weight:bold;">${unlockedCount}/${totalCount}</span></button>
+        <button class="secondary" style="text-align: left; padding: 14px; display:flex; justify-content:space-between; align-items:center;" onclick="achievementsScreen()"><span>🎖️ Conquistas & Ranks</span><span style="font-size:12px; color:#00f3ff; font-weight:bold;">${unlockedCount}/${totalCount}</span></button>
         <button class="secondary" style="text-align: left; padding: 14px;" onclick="settingsScreen()">⚙️ Configurações</button>
         <button class="secondary" style="text-align: left; padding: 14px;" onclick="pdfScreen()">📄 Planilha / PDF</button>
     </div>
@@ -434,10 +441,10 @@ function renderWorkout(){
 
     app.innerHTML=`<div class="app">${header(v.name)}
     <div class="muted">${v.desc} · ${v.mob}</div>
-    <div class="start-panel">
+    <div class="start-panel" style="padding:16px;">
         <div><strong>${started?'Treino em andamento':'Treino não iniciado'}</strong>
-        <div class="muted">${started?'O tempo está contando.':'Quando estiver pronto, toque em iniciar.'}</div></div>
-        <button class="primary start-workout" onclick="startWorkout()" ${started?'disabled':''}>${started?'✓ Iniciado':'▶ Iniciar'}</button>
+        <div class="muted" style="font-size:13px;">${started?'O tempo está contando.':'Quando estiver pronto, toque em iniciar.'}</div></div>
+        <button class="primary start-workout" style="font-size:16px; padding:12px 20px;" onclick="startWorkout()" ${started?'disabled':''}>${started?'✓ Iniciado':'▶ Iniciar'}</button>
     </div>
     
     ${v.ex.map((ex,i)=>exerciseHTML(ex,i,d)).join('')}
@@ -452,16 +459,16 @@ function renderWorkout(){
     <button class="finish" onclick="finishWorkout()" ${started?'':'disabled'}>✓ Finalizar e salvar treino</button>
     <button class="secondary danger" onclick="cancelWorkout()">Sair e manter rascunho</button>
     
-    <div class="total-bottom">
-        <div class="muted">TEMPO TOTAL DO TREINO</div>
+    <div class="total-bottom" style="padding:18px; border:2px solid rgba(0,243,255,0.3);">
+        <div class="muted" style="font-size:12px; font-weight:bold; letter-spacing:1px;">TEMPO TOTAL DO TREINO</div>
         <strong id="totalTime">${started?formatDuration(Math.floor((Date.now()-d.startedAt)/1000)):'00:00'}</strong>
-        <div style="margin-top:6px; font-size:12px; color:#aaa;">Volume Total: <strong style="color:#00f3ff;">${metrics.totalVolume.toLocaleString('pt-BR')} kg</strong></div>
-        <div style="font-size:12px; color:#aaa;">Carga Somada Bruta: <strong style="color:#a855f7;">${metrics.totalWeightRaw.toLocaleString('pt-BR')} kg</strong></div>
-        <div class="muted" id="restTotalLabel" style="margin-top:4px;">Descanso registrado: ${formatDuration(d.restTotal||0)}</div>
+        <div style="margin-top:8px; font-size:14px; color:#aaa;">Volume Total: <strong style="color:#00f3ff; font-size:16px;">${metrics.totalVolume.toLocaleString('pt-BR')} kg</strong></div>
+        <div style="font-size:14px; color:#aaa;">Carga Somada Bruta: <strong style="color:#a855f7; font-size:16px;">${metrics.totalWeightRaw.toLocaleString('pt-BR')} kg</strong></div>
+        <div class="muted" id="restTotalLabel" style="margin-top:6px; font-size:13px;">Descanso registrado: ${formatDuration(d.restTotal||0)}</div>
     </div></div>
     
     <div class="global-rest" id="globalRest">
-        <div><small>DESCANSO</small><strong id="globalRestClock">00:00</strong></div>
+        <div><small style="font-size:11px; font-weight:bold;">TEMPORIZADOR DE DESCANSO</small><br><strong id="globalRestClock">00:00</strong></div>
         <div class="global-rest-actions">
             <button class="mini" onclick="setGlobalRest(45)">45s</button>
             <button class="mini" onclick="setGlobalRest(60)">1m</button>
@@ -492,12 +499,12 @@ function exerciseHTML(ex,i,d){
     let lastGroup=-1;
     const pr = getExercisePR(current, i);
     
-    let html=`<div class="card">
+    let html=`<div class="card" style="padding:16px;">
         <div class="exercise-head" style="display:flex; justify-content:space-between; align-items:center;">
-            <div class="exercise-name" style="flex:1;">${i+1}. ${esc(name)}</div>
-            <button class="mini" type="button" style="margin-left:8px;" onclick="swapExercise(${i})">🔄 Trocar</button>
+            <div class="exercise-name" style="flex:1; font-size:18px !important; font-weight:bold; color:#fff;">${i+1}. ${esc(name)}</div>
+            <button class="mini" type="button" style="margin-left:8px; font-size:12px; padding:6px 10px;" onclick="swapExercise(${i})">🔄 Trocar</button>
         </div>
-        ${tech?`<div class="tech">⚡ ${esc(tech)}</div>`:''}`;
+        ${tech?`<div class="tech" style="font-size:14px; font-weight:bold; color:#00f3ff; margin-top:6px;">⚡ ${esc(tech)}</div>`:''}`;
     
     rows.forEach((r,si)=>{
         const [type,qty,reps,rest]=r.group;
@@ -522,30 +529,30 @@ function exerciseHTML(ex,i,d){
         
         const isPR = currentKg > 0 && (currentKg > pr.kg || (currentKg === pr.kg && currentReps > pr.reps && pr.kg > 0));
 
-        const badgeHtml = isPR ? `<span class="pr-badge-live">⚡ NOVO PR!</span>` : `<span style="font-size:11px; color:#a855f7;">${prevLabel}</span>`;
+        const badgeHtml = isPR ? `<span class="pr-badge-live">⚡ NOVO PR!</span>` : `<span style="font-size:12px; color:#a855f7; font-weight:bold;">${prevLabel}</span>`;
 
-        html+=`<div class="set"><div class="sethead"><div class="settype">${esc(type)} · Série ${r.number}/${r.total}</div>${badgeHtml}</div>
-        <div class="fields">
-            <label>REPS FEITAS
-                <div style="display:flex; gap:4px; align-items:center;">
-                    <button class="mini" type="button" onclick="adjustVal(${i},${si},'reps',-1)">-</button>
-                    <input type="number" id="inp-reps-${i}-${si}" min="0" inputmode="numeric" placeholder="${prev?prev.reps:''}" value="${esc(x.reps??'')}" onchange="setVal(${i},${si},'reps',this.value)">
-                    <button class="mini" type="button" onclick="adjustVal(${i},${si},'reps',1)">+</button>
+        html+=`<div class="set" style="padding:12px 0; border-bottom:1px solid rgba(255,255,255,0.06);"><div class="sethead"><div class="settype" style="font-size:15px; font-weight:bold; color:#00f3ff;">${esc(type)} · Série ${r.number}/${r.total}</div>${badgeHtml}</div>
+        <div class="fields" style="margin-top:8px;">
+            <label style="font-size:12px; font-weight:bold; color:#aaa;">REPS FEITAS
+                <div style="display:flex; gap:4px; align-items:center; margin-top:4px;">
+                    <button class="mini" type="button" style="padding:8px 12px; font-size:16px;" onclick="adjustVal(${i},${si},'reps',-1)">-</button>
+                    <input type="number" id="inp-reps-${i}-${si}" min="0" inputmode="numeric" style="font-size:16px; font-weight:bold; text-align:center;" placeholder="${prev?prev.reps:''}" value="${esc(x.reps??'')}" onchange="setVal(${i},${si},'reps',this.value)">
+                    <button class="mini" type="button" style="padding:8px 12px; font-size:16px;" onclick="adjustVal(${i},${si},'reps',1)">+</button>
                 </div>
             </label>
-            <label>CARGA (KG)
-                <div style="display:flex; gap:4px; align-items:center;">
-                    <button class="mini" type="button" onclick="adjustVal(${i},${si},'kg',-2.5)">-</button>
-                    <input type="number" id="inp-kg-${i}-${si}" min="0" step="0.5" inputmode="decimal" placeholder="${prev?prev.kg:''}" value="${esc(x.kg??'')}" onchange="setVal(${i},${si},'kg',this.value)">
-                    <button class="mini" type="button" onclick="adjustVal(${i},${si},'kg',2.5)">+</button>
+            <label style="font-size:12px; font-weight:bold; color:#aaa;">CARGA (KG)
+                <div style="display:flex; gap:4px; align-items:center; margin-top:4px;">
+                    <button class="mini" type="button" style="padding:8px 12px; font-size:16px;" onclick="adjustVal(${i},${si},'kg',-2.5)">-</button>
+                    <input type="number" id="inp-kg-${i}-${si}" min="0" step="0.5" inputmode="decimal" style="font-size:16px; font-weight:bold; text-align:center;" placeholder="${prev?prev.kg:''}" value="${esc(x.kg??'')}" onchange="setVal(${i},${si},'kg',this.value)">
+                    <button class="mini" type="button" style="padding:8px 12px; font-size:16px;" onclick="adjustVal(${i},${si},'kg',2.5)">+</button>
                 </div>
             </label>
         </div>
-        <div class="obs"><label>OBSERVAÇÃO<textarea onchange="setVal(${i},${si},'obs',this.value)">${esc(x.obs||'')}</textarea></label></div>${special}
-        <button class="check" onclick="toggleSet(${i},${si})">□ Marcar série concluída</button></div>`;
+        <div class="obs" style="margin-top:6px;"><label style="font-size:11px; color:#aaa;">OBSERVAÇÃO<textarea onchange="setVal(${i},${si},'obs',this.value)">${esc(x.obs||'')}</textarea></label></div>${special}
+        <button class="check" style="font-size:15px; padding:12px; font-weight:bold; margin-top:10px;" onclick="toggleSet(${i},${si})">□ Marcar série concluída</button></div>`;
     });
     
-    if(rows.some((r,si)=>!d.sets[makeKey(i,si)]?.done))html+=`<button class="exercise-finish" onclick="toggleEx(${i})">✓ Marcar exercício como concluído</button>`;
+    if(rows.some((r,si)=>!d.sets[makeKey(i,si)]?.done))html+=`<button class="exercise-finish" style="font-size:14px; font-weight:bold; padding:12px; margin-top:10px;" onclick="toggleEx(${i})">✓ Marcar exercício como concluído</button>`;
     return html+`</div>`;
 }
 
@@ -1079,6 +1086,36 @@ function viewRecord(id){
     app.innerHTML=html;
 }
 
+// --- TELA DE CONFIGURAÇÕES E EDIÇÃO DE EXERCÍCIOS ---
+function editWorkoutExercises(workoutKey) {
+    const workout = DATA[workoutKey];
+    let html = `<div class="app">${header(`Editar: ${workout.name}`)}
+    <p class="muted" style="margin-bottom:15px;">Altere os nomes dos exercícios abaixo sem modificar o restante do treino:</p>`;
+    
+    workout.ex.forEach((ex, idx) => {
+        html += `<div class="card" style="margin-bottom:10px;">
+            <label style="font-size:12px; font-weight:bold; color:#a855f7;">Exercício ${idx + 1}</label>
+            <input type="text" id="editEx-${workoutKey}-${idx}" value="${esc(ex[0])}" style="margin-top:4px; font-size:14px;">
+        </div>`;
+    });
+
+    html += `<button class="primary" style="margin-top:15px; padding:14px;" onclick="saveEditedExercises('${workoutKey}')">💾 Salvar Alterações</button>
+    <button class="secondary" style="margin-top:8px;" onclick="settingsScreen()">Cancelar</button>
+    </div>`;
+
+    app.innerHTML = html;
+}
+
+function saveEditedExercises(workoutKey) {
+    const workout = DATA[workoutKey];
+    workout.ex.forEach((ex, idx) => {
+        const inputVal = document.getElementById(`editEx-${workoutKey}-${idx}`)?.value.trim();
+        if (inputVal) ex[0] = inputVal;
+    });
+    toast('Exercícios atualizados!');
+    settingsScreen();
+}
+
 function settingsScreen(){
     stopTotalTimer();
     screen='settings';
@@ -1088,6 +1125,13 @@ function settingsScreen(){
             <input type="text" id="userNameInput" value="${esc(db.user.name)}" style="margin-top:5px;">
         </label>
         <button class="secondary" style="margin-top:10px;" onclick="updateUserName()">💾 Salvar Nome</button>
+    </div>
+
+    <div class="card" style="margin-bottom:15px;">
+        <div style="font-weight:bold; margin-bottom:8px; color:#00f3ff;">✏️ Editar Exercícios dos Treinos</div>
+        <div style="display:flex; flex-direction:column; gap:6px;">
+            ${Object.keys(DATA).map(k => `<button class="secondary" style="text-align:left; padding:10px;" onclick="editWorkoutExercises('${k}')">Editar ${DATA[k].name}</button>`).join('')}
+        </div>
     </div>
     
     <div class="card" style="margin-bottom:15px;">
@@ -1145,4 +1189,4 @@ function pdfScreen(){
 function goHome(){stopTotalTimer();clearInterval(timerId);stopAllRestTimers();home()}
 
 home();
-if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js?v=12');
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js?v=13');
