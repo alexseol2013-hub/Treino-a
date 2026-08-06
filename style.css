@@ -1,15 +1,16 @@
 :root {
-    --bg: #07060e;
-    --panel: #100d1a;
-    --panel2: #161324;
-    --line: #2d2342;
-    --purple: #a855f7;
-    --purple-dark: #8a2be2;
-    --cyan: #00f3ff;
+    --bg: #06040a;
+    --panel: #0f0a1c;
+    --panel2: #160f29;
+    --line: #2e1c4a;
+    --purple-metallic: #9d4edd;
+    --purple-dark-metallic: #5a189a;
+    --purple-deep: #3c096c;
+    --purple-light-metallic: #c77dff;
+    --silver-lavender: #e2d9f3;
     --green: #32d74b;
     --red: #ff453a;
-    --muted: #9a94a8;
-    --white: #f7f7f7;
+    --muted: #8d7eab;
 }
 
 * {
@@ -19,7 +20,7 @@
 html, body {
     margin: 0;
     background: var(--bg);
-    color: var(--white);
+    color: var(--silver-lavender);
     font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
 }
 
@@ -47,17 +48,17 @@ button {
 .brand {
     font-weight: 950;
     font-size: 27px;
-    color: var(--cyan);
+    color: var(--purple-light-metallic);
     letter-spacing: .5px;
-    text-shadow: 0 0 12px rgba(0, 243, 255, 0.3);
+    text-shadow: 0 0 14px rgba(157, 78, 221, 0.5);
 }
 
 .iconbtn {
     width: 42px;
     height: 42px;
     border-radius: 12px;
-    background: #141022;
-    color: #fff;
+    background: #130c24;
+    color: var(--silver-lavender);
     border: 1px solid var(--line);
     font-size: 20px;
 }
@@ -66,6 +67,7 @@ button {
     font-size: 25px;
     margin: 4px 0 5px;
     font-weight: 900;
+    color: var(--silver-lavender);
 }
 
 .muted {
@@ -79,31 +81,31 @@ button {
 }
 
 .day {
-    background: linear-gradient(145deg, #161226, #0b0914);
+    background: linear-gradient(145deg, #180f2e, #0a0614);
     border: 1px solid var(--line);
     border-radius: 17px;
     padding: 17px;
     text-align: left;
-    color: #fff;
+    color: var(--silver-lavender);
 }
 
 .day strong {
     display: block;
-    color: var(--cyan);
+    color: var(--purple-light-metallic);
     font-size: 21px;
 }
 
 .day span {
     display: block;
     margin-top: 4px;
-    color: #aaa;
+    color: var(--muted);
     font-size: 12px;
 }
 
 .day small {
     display: block;
     margin-top: 12px;
-    color: #666;
+    color: #6a578a;
 }
 
 .card {
@@ -112,6 +114,7 @@ button {
     border-radius: 16px;
     padding: 14px;
     margin-bottom: 13px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
 }
 
 .exercise-head {
@@ -125,6 +128,7 @@ button {
     font-size: 18px;
     font-weight: 850;
     line-height: 1.2;
+    color: var(--silver-lavender);
 }
 
 .badge {
@@ -132,8 +136,8 @@ button {
     font-weight: 800;
     padding: 5px 8px;
     border-radius: 99px;
-    background: #231b36;
-    color: #aaa;
+    background: #21133b;
+    color: var(--muted);
     white-space: nowrap;
 }
 
@@ -144,14 +148,14 @@ button {
 
 .tech {
     margin-top: 8px;
-    color: var(--purple);
+    color: var(--purple-metallic);
     font-size: 12px;
     font-weight: 750;
 }
 
 .group-label {
     margin: 14px 0 5px;
-    color: var(--purple);
+    color: var(--purple-metallic);
     font-size: 12px;
     font-weight: 900;
     text-transform: uppercase;
@@ -159,7 +163,7 @@ button {
 
 .group-label span {
     display: block;
-    color: #888;
+    color: var(--muted);
     font-size: 10px;
     font-weight: 600;
     text-transform: none;
@@ -183,13 +187,13 @@ button {
 .settype {
     font-size: 11px;
     font-weight: 900;
-    color: var(--cyan);
+    color: var(--purple-light-metallic);
     text-transform: uppercase;
 }
 
 .meta {
     font-size: 10px;
-    color: #999;
+    color: var(--muted);
     text-align: right;
 }
 
@@ -202,7 +206,7 @@ button {
 
 .fields label, .obs label {
     font-size: 9px;
-    color: #888;
+    color: var(--muted);
     font-weight: 800;
     text-transform: uppercase;
 }
@@ -210,8 +214,8 @@ button {
 .fields input, .obs textarea, .form input, .form select {
     width: 100%;
     margin-top: 4px;
-    background: #090712;
-    color: #fff;
+    background: #08050e;
+    color: var(--silver-lavender);
     border: 1px solid var(--line);
     border-radius: 9px;
     padding: 11px;
@@ -231,8 +235,8 @@ button {
     margin-top: 9px;
     padding: 11px;
     border: 1px solid var(--line);
-    background: #1f1830;
-    color: #fff;
+    background: #23153d;
+    color: var(--silver-lavender);
     border-radius: 9px;
     font-weight: 750;
 }
@@ -245,9 +249,9 @@ button {
 
 .set-rest {
     margin-top: 10px;
-    background: #0b0914;
+    background: #090512;
     border: 1px solid var(--line);
-    border-left: 3px solid var(--purple);
+    border-left: 3px solid var(--purple-metallic);
     border-radius: 10px;
     padding: 10px;
 }
@@ -261,7 +265,7 @@ button {
 
 .set-rest-top small {
     display: block;
-    color: #777;
+    color: var(--muted);
     font-size: 8px;
     font-weight: 900;
     letter-spacing: .5px;
@@ -269,14 +273,14 @@ button {
 
 .set-rest-top strong {
     display: block;
-    color: var(--cyan);
+    color: var(--purple-light-metallic);
     font: 900 22px monospace;
     margin-top: 2px;
 }
 
 .planned-rest {
     font-size: 9px;
-    color: #888;
+    color: var(--muted);
     text-align: right;
 }
 
@@ -297,8 +301,8 @@ button {
     padding: 12px;
     border: 1px solid var(--line);
     border-radius: 10px;
-    background: #1f1830;
-    color: #fff;
+    background: #23153d;
+    color: var(--silver-lavender);
     font-weight: 850;
     margin-top: 10px;
 }
@@ -314,11 +318,12 @@ button {
     padding: 13px;
     border: 0;
     border-radius: 11px;
-    background: linear-gradient(135deg, #6366f1, #8a2be2);
+    background: linear-gradient(135deg, #7b2cbf, #3c096c);
     color: #fff;
     font-weight: 950;
     margin-top: 8px;
-    box-shadow: 0 0 15px rgba(138, 43, 226, 0.4);
+    box-shadow: 0 0 15px rgba(123, 44, 191, 0.5);
+    border: 1px solid #9d4edd;
 }
 
 .finish:disabled, .primary:disabled {
@@ -332,29 +337,29 @@ button {
     padding: 11px;
     border: 1px solid var(--line);
     border-radius: 10px;
-    background: #171326;
-    color: #fff;
+    background: #180f2e;
+    color: var(--silver-lavender);
     font-weight: 750;
     margin-top: 8px;
 }
 
 .danger {
-    background: #24101d;
-    border-color: #5c1b3e;
+    background: #2b0c1e;
+    border-color: #5e1338;
     color: #ff817a;
 }
 
 .section-title {
     font-size: 14px;
     font-weight: 900;
-    color: var(--purple);
+    color: var(--purple-metallic);
     margin: 22px 2px 8px;
 }
 
 .rest-box {
-    background: #0b0914;
+    background: #090512;
     border: 1px solid var(--line);
-    border-top: 3px solid var(--purple);
+    border-top: 3px solid var(--purple-metallic);
     border-radius: 16px;
     padding: 14px;
     margin-top: 18px;
@@ -366,12 +371,12 @@ button {
 
 .clock {
     font: 900 25px monospace;
-    color: var(--cyan);
+    color: var(--purple-light-metallic);
 }
 
 .rest-box small {
     display: block;
-    color: #888;
+    color: var(--muted);
     font-weight: 800;
 }
 
@@ -386,8 +391,8 @@ button {
     padding: 8px 9px;
     border: 1px solid var(--line);
     border-radius: 8px;
-    background: #1f1830;
-    color: #fff;
+    background: #23153d;
+    color: var(--silver-lavender);
     font-size: 11px;
 }
 
@@ -410,7 +415,7 @@ button {
 .total-bottom strong {
     display: block;
     font: 900 30px monospace;
-    color: var(--cyan);
+    color: var(--purple-light-metallic);
     margin-top: 4px;
 }
 
@@ -429,6 +434,7 @@ button {
 .start-panel strong {
     display: block;
     font-size: 14px;
+    color: var(--silver-lavender);
 }
 
 .start-workout {
@@ -447,6 +453,7 @@ button {
 
 .history-item strong {
     display: block;
+    color: var(--silver-lavender);
 }
 
 .row {
@@ -459,15 +466,15 @@ button {
     display: inline-block;
     padding: 4px 7px;
     border-radius: 99px;
-    background: #231b36;
-    color: #aaa;
+    background: #21133b;
+    color: var(--muted);
     font-size: 10px;
 }
 
 .empty {
     padding: 30px 10px;
     text-align: center;
-    color: #777;
+    color: var(--muted);
 }
 
 .pdfbox {
@@ -482,13 +489,13 @@ button {
     top: 15px;
     left: 50%;
     transform: translateX(-50%);
-    background: #1c152e;
-    color: #fff;
-    border: 1px solid var(--purple-dark);
+    background: #1d0f36;
+    color: var(--silver-lavender);
+    border: 1px solid var(--purple-metallic);
     border-radius: 10px;
     padding: 10px 14px;
     z-index: 20;
-    box-shadow: 0 5px 25px rgba(0, 0, 0, 0.8);
+    box-shadow: 0 5px 25px rgba(0, 0, 0, 0.9);
 }
 
 .global-rest {
@@ -498,21 +505,21 @@ button {
     transform: translateX(-50%);
     width: min(600px, calc(100% - 20px));
     z-index: 50;
-    background: #0c0a17;
+    background: #0f0a1c;
     border: 1px solid var(--line);
-    border-bottom: 3px solid var(--purple);
+    border-bottom: 3px solid var(--purple-metallic);
     border-radius: 16px;
     padding: 10px 12px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 10px;
-    box-shadow: 0 8px 30px rgba(0,0,0,0.8);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.9);
 }
 
 .global-rest small {
     display: block;
-    color: #888;
+    color: var(--muted);
     font-size: 8px;
     font-weight: 900;
     letter-spacing: .7px;
@@ -520,7 +527,7 @@ button {
 
 .global-rest strong {
     display: block;
-    color: var(--cyan);
+    color: var(--purple-light-metallic);
     font: 900 25px monospace;
 }
 
@@ -535,9 +542,9 @@ button {
     margin-top: 8px;
     padding: 8px 9px;
     border-radius: 8px;
-    background: rgba(138, 43, 226, 0.15);
-    border-left: 3px solid var(--cyan);
-    color: var(--cyan);
+    background: rgba(123, 44, 191, 0.2);
+    border-left: 3px solid var(--purple-metallic);
+    color: var(--purple-light-metallic);
     font-size: 10px;
     font-weight: 800;
 }
@@ -546,15 +553,15 @@ button {
     margin-top: 10px;
     padding: 10px;
     border-radius: 10px;
-    background: #090712;
+    background: #08050e;
     border: 1px solid var(--line);
-    color: #aaa;
+    color: var(--muted);
     font-size: 11px;
 }
 
 .evolution b {
     display: block;
-    color: var(--cyan);
+    color: var(--purple-light-metallic);
     margin-bottom: 5px;
 }
 
@@ -563,11 +570,11 @@ button {
 }
 
 .evolution strong {
-    color: #fff;
+    color: var(--silver-lavender);
 }
 
 .evolution span {
-    color: #777;
+    color: var(--muted);
 }
 
 @media(max-width: 450px) {
