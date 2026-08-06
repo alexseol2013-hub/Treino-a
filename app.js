@@ -43,7 +43,17 @@ E:{name:'Treino E',desc:'Bíceps, costas e abdômen',mob:'Mobilidade de ombros e
 };
 
 const KEY='solo_leveling_v13';
-let db=JSON.parse(localStorage.getItem(KEY)||'null')||{history:[],drafts:{},user:{name:'Alexsandro'},restState:{deadline:0,total:0,startedAt:0}};
+
+// CORREÇÃO 1: Leitura segura do localStorage contra dados corrompidos
+let db;
+try {
+    db = JSON.parse(localStorage.getItem(KEY)) || null;
+} catch (e) {
+    console.error("Erro ao ler localStorage, reiniciando estado:", e);
+    db = null;
+}
+db = db || {history:[],drafts:{},user:{name:'Alexsandro'},restState:{deadline:0,total:0,startedAt:0}};
+
 let screen='home',current=null,timerId=null,totalTimerId=null;
 
 let currentEvolutionMetric = 'kg'; 
@@ -88,6 +98,10 @@ const SoundFX = {
         } catch(e) {}
     }
 };
+
+// CORREÇÃO 3: Desbloqueio preventivo do AudioContext via interação direta do usuário
+document.addEventListener('touchstart', () => SoundFX.init(), { once: true });
+document.addEventListener('click', () => SoundFX.init(), { once: true });
 
 function playBeep() {
     try {
@@ -642,7 +656,7 @@ function finishWorkout(){
     delete db.drafts[current];
     save();
     stopTotalTimer();
-    clearInterval(timerId);
+    if (timerId) clearInterval(timerId);
     stopAllRestTimers();
     releaseWakeLock();
 
@@ -677,7 +691,7 @@ function showVictoryModal(record){
     </div>`;
 }
 
-function cancelWorkout(){if(confirm('Sair agora? O rascunho ficará salvo para continuar depois.')){stopTotalTimer();clearInterval(timerId);stopAllRestTimers();releaseWakeLock();home()}}
+function cancelWorkout(){if(confirm('Sair agora? O rascunho ficará salvo para continuar depois.')){stopTotalTimer();if(timerId)clearInterval(timerId);stopAllRestTimers();releaseWakeLock();home()}}
 
 function startTotalTimer(){stopTotalTimer();totalTimerId=setInterval(()=>{const d=draft();const x=document.getElementById('totalTime');if(x&&d.startedAt)x.textContent=formatDuration(Math.floor((Date.now()-d.startedAt)/1000));const y=document.getElementById('restTotalLabel');if(y)y.textContent='Descanso registrado: '+formatDuration(restTotalForDraft())},1000)}
 function stopTotalTimer(){if(totalTimerId)clearInterval(totalTimerId);totalTimerId=null}
@@ -694,16 +708,17 @@ function updateGlobalRestUI(){
     el.textContent=fmt(left);
 }
 
+// CORREÇÃO 4: Prevenção de múltiplos intervalos e acúmulo de timers
 function startGlobalRest(){
     requestNotifications();
     SoundFX.init();
+    if (timerId) clearInterval(timerId);
     if(db.restState?.deadline)stopGlobalRest(false);
-    const total = db.restState?.total > 0 ? db.restState.total : 60;
     
+    const total = db.restState?.total > 0 ? db.restState.total : 60;
     db.restState = { startedAt: Date.now(), deadline: Date.now() + total * 1000, total: total };
     save();
     
-    clearInterval(timerId);
     timerId=setInterval(()=>{
         const now = Date.now();
         if(now >= db.restState.deadline){
@@ -1186,7 +1201,7 @@ function pdfScreen(){
     document.getElementById('pdfInput').onchange=e=>{const f=e.target.files[0];if(f){const u=URL.createObjectURL(f);window.open(u,'_blank')}}
 }
 
-function goHome(){stopTotalTimer();clearInterval(timerId);stopAllRestTimers();home()}
+function goHome(){stopTotalTimer();if(timerId)clearInterval(timerId);stopAllRestTimers();home()}
 
 home();
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js?v=13');
