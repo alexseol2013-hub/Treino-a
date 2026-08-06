@@ -67,21 +67,24 @@ const SoundFX = {
             this.ctx.resume();
         }
     },
-    playExp() {
+    playRestDone() {
         try {
             this.init();
             if (!this.ctx) return;
-            const osc = this.ctx.createOscillator();
-            const gain = this.ctx.createGain();
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(523.25, this.ctx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(1046.50, this.ctx.currentTime + 0.12);
-            gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.12);
-            osc.connect(gain);
-            gain.connect(this.ctx.destination);
-            osc.start();
-            osc.stop(this.ctx.currentTime + 0.12);
+            const freqs = [880, 880, 1760];
+            freqs.forEach((freq, idx) => {
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.value = freq;
+                const startTime = this.ctx.currentTime + (idx * 0.15);
+                gain.gain.setValueAtTime(0.15, startTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.12);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(startTime);
+                osc.stop(startTime + 0.12);
+            });
         } catch(e) {}
     },
     playLevelUp() {
@@ -103,26 +106,6 @@ const SoundFX = {
                 osc.stop(startTime + 0.15);
             });
         } catch(e) {}
-    },
-    playPR() {
-        try {
-            this.init();
-            if (!this.ctx) return;
-            const notes = [587.33, 739.99, 880.00, 1174.66];
-            notes.forEach((freq, idx) => {
-                const osc = this.ctx.createOscillator();
-                const gain = this.ctx.createGain();
-                osc.type = 'square';
-                osc.frequency.value = freq;
-                const startTime = this.ctx.currentTime + (idx * 0.08);
-                gain.gain.setValueAtTime(0.05, startTime);
-                gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.2);
-                osc.connect(gain);
-                gain.connect(this.ctx.destination);
-                osc.start(startTime);
-                osc.stop(startTime + 0.2);
-            });
-        } catch(e) {}
     }
 };
 
@@ -135,14 +118,14 @@ function calcular1RM(peso, reps) {
     return Math.round(p * (1 + (r / 30)));
 }
 
-// Injeta estilos da animação do Badge de PR Monarca no head
+// Estilo Badge de PR Monarca
 if(!document.getElementById('monarch-pr-styles')){
     const styleEl = document.createElement('style');
     styleEl.id = 'monarch-pr-styles';
     styleEl.textContent = `
         @keyframes prMonarchPulse {
             0% { transform: scale(1); box-shadow: 0 0 8px rgba(0,243,255,0.4); }
-            50% { transform: scale(1.05); box-shadow: 0 0 18px rgba(0,243,255,0.9); }
+            50% { transform: scale(1.04); box-shadow: 0 0 16px rgba(0,243,255,0.9); }
             100% { transform: scale(1); box-shadow: 0 0 8px rgba(0,243,255,0.4); }
         }
         .pr-badge-live {
@@ -199,15 +182,94 @@ function getRelativeDate(isoString){
 function getUserStats(){
     const totalWorkouts = db.history.length;
     let totalXP = 0;
+    let totalVolume = 0;
+    let totalCardioMin = 0;
+    let max1RMGlobal = 0;
+
     db.history.forEach(r => {
         totalXP += 25;
         const cardioMin = parseFloat(r.data?.cardio?.time) || 0;
+        totalCardioMin += cardioMin;
         totalXP += Math.floor(cardioMin * 0.5);
+        totalVolume += (r.totalVolume || 0);
+
+        const wData = DATA[r.workout];
+        if(wData){
+            wData.ex.forEach((exInfo, i) => {
+                expandedGroups(exInfo[1]).forEach((_, j) => {
+                    const setData = r.data?.sets?.[`${r.workout}-${i}-${j}`] || {};
+                    const c1rm = calcular1RM(setData.kg, setData.reps);
+                    if(c1rm > max1RMGlobal) max1RMGlobal = c1rm;
+                });
+            });
+        }
     });
+
     const level = Math.floor(totalXP / 100) + 1;
     const currentLevelXP = totalXP % 100;
     const lastWorkout = db.history.length ? db.history[db.history.length - 1].date : null;
-    return { level, currentLevelXP, totalWorkouts, lastWorkoutDateStr: getRelativeDate(lastWorkout) };
+    return { level, currentLevelXP, totalWorkouts, lastWorkoutDateStr: getRelativeDate(lastWorkout), totalVolume, totalCardioMin, max1RMGlobal };
+}
+
+// --- SISTEMA DE CONQUISTAS DE CAÇADOR (BADGES) ---
+function getAchievements() {
+    const stats = getUserStats();
+    const achievements = [
+        { id: 'first_step', title: 'Primeiro Despertar', desc: 'Conclua seu 1º treino no sistema.', icon: '🗡️', current: stats.totalWorkouts, target: 1 },
+        { id: 'workout_5', title: 'Caçador de Classe E', desc: 'Conclua 5 treinos.', icon: '🛡️', current: stats.totalWorkouts, target: 5 },
+        { id: 'workout_20', title: 'Caçador de Classe C', desc: 'Conclua 20 treinos.', icon: '⚔️', current: stats.totalWorkouts, target: 20 },
+        { id: 'workout_50', title: 'Caçador de Classe S', desc: 'Conclua 50 treinos.', icon: '👑', current: stats.totalWorkouts, target: 50 },
+        { id: 'vol_10t', title: 'Mestre da Força I', desc: 'Levante 10 Toneladas em volume total acumulado.', icon: '🏋️', current: Math.floor(stats.totalVolume / 1000), target: 10, unit: 't' },
+        { id: 'vol_100t', title: 'Monarca das Cargas', desc: 'Levante 100 Toneladas em volume acumulado.', icon: '🔥', current: Math.floor(stats.totalVolume / 1000), target: 100, unit: 't' },
+        { id: 'cardio_60', title: 'Maratonista das Sombras', desc: 'Acumule 60 minutos de cardio.', icon: '🏃', current: Math.floor(stats.totalCardioMin), target: 60, unit: 'min' },
+        { id: 'rm_50', title: 'Quebrador de Limites I', desc: 'Alcançe uma 1RM estimada de 50 kg em qualquer exercício.', icon: '⚡', current: stats.max1RMGlobal, target: 50, unit: 'kg' },
+        { id: 'rm_100', title: 'Força do Monarca', desc: 'Alcançe uma 1RM estimada de 100 kg.', icon: '💥', current: stats.max1RMGlobal, target: 100, unit: 'kg' },
+        { id: 'lvl_10', title: 'Soberano Absoluto', desc: 'Alcance o Nível 10 de Caçador.', icon: '🌌', current: stats.level, target: 10 }
+    ];
+
+    let unlockedCount = 0;
+    achievements.forEach(a => {
+        a.unlocked = a.current >= a.target;
+        if (a.unlocked) unlockedCount++;
+    });
+
+    return { achievements, unlockedCount, totalCount: achievements.length };
+}
+
+function achievementsScreen() {
+    stopTotalTimer();
+    screen = 'achievements';
+    const { achievements, unlockedCount, totalCount } = getAchievements();
+
+    let html = `<div class="app">${header('Conquistas & Títulos')}
+    <div class="card" style="background: linear-gradient(135deg, rgba(20,15,35,0.95), rgba(10,8,20,0.98)); border: 1px solid #8a2be2; margin-bottom: 20px; text-align:center;">
+        <div style="font-size: 32px; margin-bottom:4px;">🎖️</div>
+        <div style="font-size: 20px; font-weight: bold; color: #fff;">Conquistas do Caçador</div>
+        <div style="font-size: 13px; color: #00f3ff; margin-top: 4px; font-weight:bold;">${unlockedCount} de ${totalCount} Desbloqueadas</div>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:12px;">`;
+
+    achievements.forEach(a => {
+        const pct = Math.min(100, Math.floor((a.current / a.target) * 100));
+        const unit = a.unit || '';
+        html += `<div class="card" style="display:flex; gap:12px; align-items:center; border: 1px solid ${a.unlocked ? '#00f3ff' : 'rgba(255,255,255,0.1)'}; background: ${a.unlocked ? 'rgba(0, 243, 255, 0.05)' : 'rgba(15,12,25,0.6)'}">
+            <div style="font-size:36px; opacity:${a.unlocked ? '1' : '0.3'}">${a.icon}</div>
+            <div style="flex:1;">
+                <div style="display:flex; justify-content:space-between; align-items:baseline;">
+                    <strong style="font-size:15px; color:${a.unlocked ? '#00f3ff' : '#fff'}">${esc(a.title)}</strong>
+                    ${a.unlocked ? `<span style="font-size:10px; color:#00f3ff; font-weight:bold; border:1px solid #00f3ff; padding:2px 6px; border-radius:4px;">DESBLOQUEADO</span>` : `<span style="font-size:11px; color:#aaa;">${a.current}/${a.target}${unit}</span>`}
+                </div>
+                <div class="muted" style="font-size:12px; margin-top:2px;">${esc(a.desc)}</div>
+                ${!a.unlocked ? `
+                <div style="width:100%; background:rgba(255,255,255,0.08); height:6px; border-radius:3px; overflow:hidden; margin-top:8px;">
+                    <div style="width:${pct}%; background:#a855f7; height:100%;"></div>
+                </div>` : ''}
+            </div>
+        </div>`;
+    });
+
+    html += `</div></div>`;
+    app.innerHTML = html;
 }
 
 async function requestWakeLock() {
@@ -215,10 +277,6 @@ async function requestWakeLock() {
 }
 function releaseWakeLock() {
     if (wakeLock) { wakeLock.release(); wakeLock = null; }
-}
-
-function playBeep() {
-    SoundFX.playExp();
 }
 
 async function requestNotifications(){try{if('Notification' in window&&Notification.permission==='default')await Notification.requestPermission()}catch(e){}}
@@ -238,7 +296,7 @@ function showRestAlertModal() {
 }
 
 function notifyRestDone(){
-    playBeep();
+    SoundFX.playRestDone();
     navigator.vibrate?.([500,200,500,200,800]);
     if('Notification' in window && Notification.permission==='granted'){
         try{ new Notification('Solo Leveling',{body:'⏱️ Descanso concluído! Hora de subir de nível.',icon:'icon.svg',tag:'solo-rest'}); }catch(e){}
@@ -250,6 +308,7 @@ function home(){
     stopTotalTimer();
     screen='home';
     const stats = getUserStats();
+    const { unlockedCount, totalCount } = getAchievements();
     
     app.innerHTML=`<div class="app">${header('Painel do Caçador', false)}
     <div class="card" style="background: linear-gradient(135deg, rgba(20,15,35,0.95), rgba(10,8,20,0.98)); border: 1px solid #8a2be2; box-shadow: 0 0 25px rgba(138, 43, 226, 0.25); border-radius: 12px; padding: 16px; margin-bottom: 20px;">
@@ -272,6 +331,7 @@ function home(){
         <button class="secondary" style="text-align: left; padding: 14px;" onclick="historyScreen()">📈 Histórico e Estatísticas</button>
         <button class="secondary" style="text-align: left; padding: 14px;" onclick="evolutionScreen(currentEvolutionFilter)">📊 Evolução de Cargas & Volume</button>
         <button class="secondary" style="text-align: left; padding: 14px;" onclick="recordsScreen(currentRecordsFilter)">🏆 Recordes Pessoais (PRs)</button>
+        <button class="secondary" style="text-align: left; padding: 14px; display:flex; justify-content:space-between; align-items:center;" onclick="achievementsScreen()"><span>🎖️ Conquistas & Títulos</span><span style="font-size:12px; color:#00f3ff; font-weight:bold;">${unlockedCount}/${totalCount}</span></button>
         <button class="secondary" style="text-align: left; padding: 14px;" onclick="settingsScreen()">⚙️ Configurações</button>
         <button class="secondary" style="text-align: left; padding: 14px;" onclick="pdfScreen()">📄 Planilha / PDF</button>
     </div>
@@ -285,10 +345,12 @@ function selectWorkoutScreen(){
     </div>`;
 }
 
+// Retorna o melhor 1RM registrado no histórico para determinado exercício
 function getExercisePR(workoutKey, exIndex) {
     const exName = DATA[workoutKey]?.ex[exIndex]?.[0];
     if(!exName) return { kg: 0, reps: 0, max1RM: 0 };
     let bestKg = 0, bestReps = 0, max1RM = 0;
+    
     db.history.forEach(r => {
         const wData = DATA[r.workout];
         if(!wData) return;
@@ -432,10 +494,12 @@ function exerciseHTML(ex,i,d){
         const prev = getLastExerciseData(current, i, si);
         const prevLabel = prev ? `Anterior: ${prev.kg}kg × ${prev.reps}` : 'Primeira vez';
         
-        const currentKg = parseFloat(x.kg) || 0;
-        const currentReps = parseInt(x.reps) || 0;
+        const currentKg = parseFloat(x.kg ?? (prev ? prev.kg : 0)) || 0;
+        const currentReps = parseInt(x.reps ?? (prev ? prev.reps : 0)) || 0;
         const current1RM = calcular1RM(currentKg, currentReps);
-        const isPR = currentKg > 0 && current1RM > pr.max1RM && pr.max1RM > 0;
+        
+        // Verificação precisa de PR dinâmico
+        const isPR = current1RM > pr.max1RM && current1RM > 0;
 
         const badgeHtml = isPR ? `<span class="pr-badge-live">⚡ NOVO PR! (${current1RM}kg 1RM)</span>` : `<span style="font-size:11px; color:#a855f7;">${prevLabel} ${current1RM > 0 ? `· 1RM: ${current1RM}kg` : ''}</span>`;
 
@@ -484,25 +548,15 @@ function toggleSet(i,j){
     const d=draft(),k=makeKey(i,j);
     d.sets[k]??={};
 
-    if(!d.sets[k].kg || !d.sets[k].reps){
+    if(d.sets[k].kg === undefined || d.sets[k].reps === undefined){
         const prev = getLastExerciseData(current, i, j);
         if(prev){
-            d.sets[k].kg = d.sets[k].kg || prev.kg;
-            d.sets[k].reps = d.sets[k].reps || prev.reps;
+            d.sets[k].kg = d.sets[k].kg ?? prev.kg;
+            d.sets[k].reps = d.sets[k].reps ?? prev.reps;
         }
     }
 
     d.sets[k].done=!d.sets[k].done;
-    
-    if (d.sets[k].done) {
-        const pr = getExercisePR(current, i);
-        const c1rm = calcular1RM(d.sets[k].kg, d.sets[k].reps);
-        if (c1rm > pr.max1RM && pr.max1RM > 0) {
-            SoundFX.playPR();
-        } else {
-            SoundFX.playExp();
-        }
-    }
 
     const ex = DATA[current].ex[i];
     const rows = expandedGroups(ex[1]);
@@ -518,7 +572,6 @@ function toggleSet(i,j){
 function toggleEx(i){
     const d=draft();
     d.exDone[i]=!d.exDone[i];
-    if(d.exDone[i]) SoundFX.playExp();
     save();
     renderWorkout();
 }
