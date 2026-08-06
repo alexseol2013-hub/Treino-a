@@ -42,7 +42,7 @@ E:{name:'Treino E',desc:'Bíceps, costas e abdômen',mob:'Mobilidade de ombros e
 ['Abdominal supra na prancha declinada',[['Trabalho','3','RM','45 s']], '3x RM (máximo de repetições possíveis) · intervalo 1 min'] ]}
 };
 
-const KEY='solo_leveling_v11';
+const KEY='solo_leveling_v12';
 let db=JSON.parse(localStorage.getItem(KEY)||'null')||{history:[],drafts:{},user:{name:'Alexsandro'},restState:{deadline:0,total:0,startedAt:0}};
 let screen='home',current=null,timerId=null,totalTimerId=null;
 
@@ -55,7 +55,7 @@ let activeChartInstance = null;
 let wakeLock = null;
 const app=document.getElementById('app');
 
-// --- MÓDULO DE EFEITOS SONOROS (WEB AUDIO API) ---
+// --- SISTEMA DE EFEITOS SONOROS ---
 const SoundFX = {
     ctx: null,
     init() {
@@ -89,7 +89,6 @@ const SoundFX = {
     }
 };
 
-// Som original longo do timer de descanso (1.5 segundos)
 function playBeep() {
     try {
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -105,7 +104,6 @@ function playBeep() {
     } catch(e) {}
 }
 
-// Estilo Badge de PR Monarca
 if(!document.getElementById('monarch-pr-styles')){
     const styleEl = document.createElement('style');
     styleEl.id = 'monarch-pr-styles';
@@ -166,6 +164,23 @@ function getRelativeDate(isoString){
     return `Há ${diffDays} dias`;
 }
 
+// --- FÓRMULA EXPONENCIAL DE XP & DESTAQUE DE NÍVEL ---
+function getRankTitle(level) {
+    if (level >= 200) return "Monarca das Sombras";
+    if (level >= 150) return "Caçador Rank Nacional";
+    if (level >= 100) return "Caçador Rank S";
+    if (level >= 80)  return "Caçador Rank A";
+    if (level >= 60)  return "Caçador Rank B";
+    if (level >= 40)  return "Caçador Rank C";
+    if (level >= 20)  return "Caçador Rank D";
+    if (level >= 10)  return "Caçador Rank E";
+    return "Primeiro Despertar";
+}
+
+function getRequiredXPForLevel(lvl) {
+    return Math.floor(100 * Math.pow(lvl, 2.35));
+}
+
 function getUserStats(){
     const totalWorkouts = db.history.length;
     let totalXP = 0;
@@ -174,11 +189,13 @@ function getUserStats(){
     let maxKgGlobal = 0;
 
     db.history.forEach(r => {
-        totalXP += 25;
         const cardioMin = parseFloat(r.data?.cardio?.time) || 0;
+        const vol = (r.totalVolume || 0);
+        totalVolume += vol;
         totalCardioMin += cardioMin;
-        totalXP += Math.floor(cardioMin * 0.5);
-        totalVolume += (r.totalVolume || 0);
+
+        // Base de XP: 200 XP por treino + 1 XP por min de cardio + 1 XP a cada 50kg levantados
+        totalXP += 200 + Math.floor(cardioMin) + Math.floor(vol / 50);
 
         const wData = DATA[r.workout];
         if(wData){
@@ -192,26 +209,47 @@ function getUserStats(){
         }
     });
 
-    const level = Math.floor(totalXP / 100) + 1;
-    const currentLevelXP = totalXP % 100;
+    // Nível calculado com progressão exponencial rígida
+    let level = 1;
+    let accumulatedXP = totalXP;
+    while (accumulatedXP >= getRequiredXPForLevel(level)) {
+        accumulatedXP -= getRequiredXPForLevel(level);
+        level++;
+    }
+
+    const nextLevelReq = getRequiredXPForLevel(level);
+    const progressPct = Math.min(100, Math.floor((accumulatedXP / nextLevelReq) * 100));
+    const rank = getRankTitle(level);
     const lastWorkout = db.history.length ? db.history[db.history.length - 1].date : null;
-    return { level, currentLevelXP, totalWorkouts, lastWorkoutDateStr: getRelativeDate(lastWorkout), totalVolume, totalCardioMin, maxKgGlobal };
+
+    return { 
+        level, 
+        rank,
+        currentLevelXP: accumulatedXP, 
+        nextLevelReq, 
+        progressPct, 
+        totalWorkouts, 
+        lastWorkoutDateStr: getRelativeDate(lastWorkout), 
+        totalVolume, 
+        totalCardioMin, 
+        maxKgGlobal 
+    };
 }
 
-// --- SISTEMA DE CONQUISTAS DE CAÇADOR (BADGES) ---
+// --- CONQUISTAS DO SISTEMA ---
 function getAchievements() {
     const stats = getUserStats();
     const achievements = [
         { id: 'first_step', title: 'Primeiro Despertar', desc: 'Conclua seu 1º treino no sistema.', icon: '🗡️', current: stats.totalWorkouts, target: 1 },
-        { id: 'workout_5', title: 'Caçador de Classe E', desc: 'Conclua 5 treinos.', icon: '🛡️', current: stats.totalWorkouts, target: 5 },
-        { id: 'workout_20', title: 'Caçador de Classe C', desc: 'Conclua 20 treinos.', icon: '⚔️', current: stats.totalWorkouts, target: 20 },
-        { id: 'workout_50', title: 'Caçador de Classe S', desc: 'Conclua 50 treinos.', icon: '👑', current: stats.totalWorkouts, target: 50 },
+        { id: 'workout_5', title: 'Caçador Rank E', desc: 'Conclua 5 treinos.', icon: '🛡️', current: stats.totalWorkouts, target: 5 },
+        { id: 'workout_20', title: 'Caçador Rank C', desc: 'Conclua 20 treinos.', icon: '⚔️', current: stats.totalWorkouts, target: 20 },
+        { id: 'workout_50', title: 'Caçador Rank S', desc: 'Conclua 50 treinos.', icon: '👑', current: stats.totalWorkouts, target: 50 },
         { id: 'vol_10t', title: 'Mestre da Força I', desc: 'Levante 10 Toneladas em volume total acumulado.', icon: '🏋️', current: Math.floor(stats.totalVolume / 1000), target: 10, unit: 't' },
         { id: 'vol_100t', title: 'Monarca das Cargas', desc: 'Levante 100 Toneladas em volume acumulado.', icon: '🔥', current: Math.floor(stats.totalVolume / 1000), target: 100, unit: 't' },
         { id: 'cardio_60', title: 'Maratonista das Sombras', desc: 'Acumule 60 minutos de cardio.', icon: '🏃', current: Math.floor(stats.totalCardioMin), target: 60, unit: 'min' },
         { id: 'kg_50', title: 'Quebrador de Limites I', desc: 'Alcance 50 kg de carga em um exercício.', icon: '⚡', current: stats.maxKgGlobal, target: 50, unit: 'kg' },
         { id: 'kg_100', title: 'Força do Monarca', desc: 'Alcance 100 kg de carga em um exercício.', icon: '💥', current: stats.maxKgGlobal, target: 100, unit: 'kg' },
-        { id: 'lvl_10', title: 'Soberano Absoluto', desc: 'Alcance o Nível 10 de Caçador.', icon: '🌌', current: stats.level, target: 10 }
+        { id: 'lvl_10', title: 'Caçador Qualificado', desc: 'Alcance o Nível 10 de Caçador.', icon: '🌌', current: stats.level, target: 10 }
     ];
 
     let unlockedCount = 0;
@@ -299,14 +337,14 @@ function home(){
     
     app.innerHTML=`<div class="app">${header('Painel do Caçador', false)}
     <div class="card" style="background: linear-gradient(135deg, rgba(20,15,35,0.95), rgba(10,8,20,0.98)); border: 1px solid #8a2be2; box-shadow: 0 0 25px rgba(138, 43, 226, 0.25); border-radius: 12px; padding: 16px; margin-bottom: 20px;">
-        <div style="font-size: 11px; color: #a855f7; text-transform: uppercase; letter-spacing: 1.5px; font-weight:bold;">SISTEMA SOLO LEVELING</div>
+        <div style="font-size: 11px; color: #a855f7; text-transform: uppercase; letter-spacing: 1.5px; font-weight:bold;">${esc(stats.rank)}</div>
         <div style="font-size: 20px; font-weight: bold; color: #fff; margin-top: 2px;">${getGreeting()}, ${esc(db.user.name)}</div>
         <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 15px;">
             <span style="font-size: 16px; font-weight: bold; color: #a855f7;">Nível ${stats.level}</span>
-            <span style="font-size: 12px; color: #00f3ff; font-weight:bold;">XP: ${stats.currentLevelXP}%</span>
+            <span style="font-size: 12px; color: #00f3ff; font-weight:bold;">XP: ${stats.currentLevelXP} / ${stats.nextLevelReq}</span>
         </div>
         <div style="width: 100%; background: rgba(255,255,255,0.08); height: 10px; border-radius: 5px; overflow: hidden; margin-top: 6px; border: 1px solid rgba(138,43,226,0.3);">
-            <div style="width: ${stats.currentLevelXP}%; background: linear-gradient(90deg, #6366f1, #a855f7, #00f3ff); height: 100%; transition: width 0.3s;"></div>
+            <div style="width: ${stats.progressPct}%; background: linear-gradient(90deg, #6366f1, #a855f7, #00f3ff); height: 100%; transition: width 0.3s;"></div>
         </div>
         <div style="display: flex; justify-content: space-between; margin-top: 16px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.08); font-size: 13px;">
             <div><span style="color: #888;">Treinos Concluídos:</span> <strong style="color:#fff;">${stats.totalWorkouts}</strong></div>
@@ -482,7 +520,6 @@ function exerciseHTML(ex,i,d){
         const currentKg = parseFloat(x.kg ?? (prev ? prev.kg : 0)) || 0;
         const currentReps = parseInt(x.reps ?? (prev ? prev.reps : 0)) || 0;
         
-        // Verificação precisa de PR dinâmico (com base em Carga/Reps real do histórico)
         const isPR = currentKg > 0 && (currentKg > pr.kg || (currentKg === pr.kg && currentReps > pr.reps && pr.kg > 0));
 
         const badgeHtml = isPR ? `<span class="pr-badge-live">⚡ NOVO PR!</span>` : `<span style="font-size:11px; color:#a855f7;">${prevLabel}</span>`;
@@ -609,7 +646,7 @@ function finishWorkout(){
 function showVictoryModal(record){
     const stats = getUserStats();
     const cardioMin = parseFloat(record.data?.cardio?.time) || 0;
-    const xpGained = 25 + Math.floor(cardioMin * 0.5);
+    const xpGained = 200 + Math.floor(cardioMin) + Math.floor(record.totalVolume / 50);
 
     app.innerHTML = `<div class="app" style="text-align:center; padding-top:40px;">
         <div style="font-size: 50px;">⚡</div>
@@ -618,9 +655,10 @@ function showVictoryModal(record){
 
         <div class="card" style="border: 1px solid #8a2be2; background: rgba(138, 43, 226, 0.08); margin-top:20px; text-align:left; box-shadow: 0 0 20px rgba(138,43,226,0.3);">
             <div style="font-size:14px; font-weight:bold; color:#00f3ff;">+${xpGained} EXP ADICIONADOS</div>
-            <div style="font-size:18px; font-weight:bold; margin-top:6px;">Nível ${stats.level} <span style="font-size:12px; color:#aaa;">(${stats.currentLevelXP}%)</span></div>
+            <div style="font-size:12px; color:#a855f7; margin-top:4px; font-weight:bold;">TÍTULO: ${esc(stats.rank)}</div>
+            <div style="font-size:18px; font-weight:bold; margin-top:4px;">Nível ${stats.level} <span style="font-size:12px; color:#aaa;">(${stats.progressPct}%)</span></div>
             <div style="width: 100%; background: rgba(255,255,255,0.1); height: 10px; border-radius: 5px; overflow: hidden; margin-top: 8px;">
-                <div style="width: ${stats.currentLevelXP}%; background: linear-gradient(90deg, #6366f1, #a855f7, #00f3ff); height: 100%;"></div>
+                <div style="width: ${stats.progressPct}%; background: linear-gradient(90deg, #6366f1, #a855f7, #00f3ff); height: 100%;"></div>
             </div>
             
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:15px; font-size:13px; border-top:1px solid rgba(255,255,255,0.08); padding-top:10px;">
