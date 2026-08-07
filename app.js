@@ -344,14 +344,17 @@ function getUserStats(){
 function getAchievements() {
     const stats = getUserStats();
     const achievements = [
-        { id: 'rank_e', title: 'Erguer-se (Rank E)', desc: 'Complete seu 1º treino e entre na Dungeon.', icon: '🗝️', current: stats.totalWorkouts, target: 1 },
-        { id: 'igris', title: 'Sombra de Igris', desc: 'Quebre 10 Recordes Pessoais (PRs).', icon: '🗡️', current: stats.totalPRsCount, target: 10 },
-        { id: 'rank_c', title: 'Caçador Rank C', desc: 'Complete 30 treinos e 150 séries.', icon: '🛡️', current: stats.totalWorkouts, target: 30 },
-        { id: 'tank', title: 'Sombra de Tank', desc: 'Mova mais de 100.000 kg de volume total.', icon: '🐻', current: stats.totalVolume, target: 100000 },
-        { id: 'rank_a', title: 'Caçador Rank A', desc: 'Alcance Nível 35 e 100 treinos finalizados.', icon: '🔮', current: stats.level, target: 35 },
-        { id: 'beru', title: 'Rei Formiga (Beru)', desc: 'Acumule 1.000 minutos de cardio.', icon: '🐜', current: Math.floor(stats.totalCardioMin), target: 1000 },
-        { id: 'rank_s', title: 'Caçador Rank S', desc: 'Alcance Nível 50 na sua jornada.', icon: '👑', current: stats.level, target: 50 },
-        { id: 'monarch', title: 'Monarca das Sombras', desc: 'Conclua 300 treinos no sistema (Anos de dedicação).', icon: '☠️', current: stats.totalWorkouts, target: 300 }
+        { id: 'rank_e', title: 'Rank E — Primeiro Despertar', desc: 'Complete seu 1º treino e desperte seu poder.', icon: '🗝️', current: stats.totalWorkouts, target: 1, unit: '' },
+        { id: 'rank_d', title: 'Caçador Rank D', desc: 'Complete 20 treinos.', icon: '🛡️', current: stats.totalWorkouts, target: 20, unit: '' },
+        { id: 'rank_c', title: 'Caçador Rank C', desc: 'Complete 50 treinos.', icon: '🛡️', current: stats.totalWorkouts, target: 50, unit: '' },
+        { id: 'rank_b', title: 'Caçador Rank B', desc: 'Complete 100 treinos.', icon: '⚔️', current: stats.totalWorkouts, target: 100, unit: '' },
+        { id: 'rank_a', title: 'Caçador Rank A', desc: 'Complete 180 treinos.', icon: '🔮', current: stats.totalWorkouts, target: 180, unit: '' },
+        { id: 'rank_s', title: 'Caçador Rank S', desc: 'Complete 280 treinos.', icon: '👑', current: stats.totalWorkouts, target: 280, unit: '' },
+        { id: 'rank_nacional', title: 'Caçador Rank Nacional', desc: 'Complete 400 treinos.', icon: '🎖️', current: stats.totalWorkouts, target: 400, unit: '' },
+        { id: 'monarch', title: 'Monarca das Sombras', desc: 'Complete 550 treinos (Anos de dedicação).', icon: '☠️', current: stats.totalWorkouts, target: 550, unit: '' },
+        { id: 'absoluto', title: 'Ser Absoluto', desc: 'Complete 750 treinos. Além dos Monarcas e Governantes.', icon: '🌌', current: stats.totalWorkouts, target: 750, unit: '' },
+        { id: 'ant_soldier', title: 'Formiga Soldado', desc: 'Acumule 1.500 minutos de cardio.', icon: '🐜', current: Math.floor(stats.totalCardioMin), target: 1500, unit: ' min' },
+        { id: 'beru', title: 'Rei Formiga (Beru)', desc: 'Acumule 6.000 minutos de cardio.', icon: '🐜', current: Math.floor(stats.totalCardioMin), target: 6000, unit: ' min' }
     ];
 
     let unlockedCount = 0;
@@ -383,7 +386,7 @@ function achievementsScreen() {
             <div style="flex:1;">
                 <div style="display:flex; justify-content:space-between; align-items:baseline;">
                     <strong style="font-size:15px; color:${a.unlocked ? '#a855f7' : '#fff'}">${esc(a.title)}</strong>
-                    ${a.unlocked ? `<span style="font-size:10px; color:#a855f7; font-weight:bold; border:1px solid #a855f7; padding:2px 6px; border-radius:4px;">DESBLOQUEADO</span>` : `<span style="font-size:11px; color:#aaa;">${typeof a.current==='number'&&a.current>1000?formatVolume(a.current):a.current}/${typeof a.target==='number'&&a.target>=1000?formatVolume(a.target):a.target}</span>`}
+                    ${a.unlocked ? `<span style="font-size:10px; color:#a855f7; font-weight:bold; border:1px solid #a855f7; padding:2px 6px; border-radius:4px;">DESBLOQUEADO</span>` : `<span style="font-size:11px; color:#aaa;">${a.current}${a.unit}/${a.target}${a.unit}</span>`}
                 </div>
                 <div class="muted" style="font-size:12px; margin-top:2px;">${esc(a.desc)}</div>
                 ${!a.unlocked ? `
@@ -718,7 +721,7 @@ function renderWorkout(){
         <div style="margin-top:8px; font-size:13px; color:#aaa;">Volume Total: <strong style="color:#a855f7; font-size:15px;">${formatVolume(metrics.totalVolume)}</strong></div>
         <div style="font-size:13px; color:#aaa;">Carga Somada Bruta: <strong style="color:#a855f7; font-size:15px;">${formatVolume(metrics.totalWeightRaw)}</strong></div>
         <div class="muted" id="restTotalLabel" style="margin-top:8px; font-size:12px; font-weight:bold; color:#e0e0e0; background:rgba(168,85,247,0.1); padding:8px; border-radius:6px; border:1px solid rgba(168,85,247,0.3);">
-            Descanso realizado: <span style="color:#a855f7;">${formatDuration(restTotalForDraft())}</span> / <span style="color:#00f3ff;">${formatDuration(d.scheduledRestTotal||0)}</span> programado
+            Descanso realizado: <span style="color:#a855f7;">${formatDuration(restTotalForDraft())}</span> / <span style="color:#7c3aed;">${formatDuration(d.scheduledRestTotal||0)}</span> programado
         </div>
     </div></div>
     
@@ -971,7 +974,7 @@ function cancelWorkout(){
     });
 }
 
-function startTotalTimer(){stopTotalTimer();totalTimerId=setInterval(()=>{const d=draft();const x=document.getElementById('totalTime');if(x&&d.startedAt)x.textContent=formatDuration(Math.floor((Date.now()-d.startedAt)/1000));const y=document.getElementById('restTotalLabel');if(y)y.innerHTML=`Descanso realizado: <span style="color:#a855f7;">${formatDuration(restTotalForDraft())}</span> / <span style="color:#00f3ff;">${formatDuration(d.scheduledRestTotal||0)}</span> programado`},1000)}
+function startTotalTimer(){stopTotalTimer();totalTimerId=setInterval(()=>{const d=draft();const x=document.getElementById('totalTime');if(x&&d.startedAt)x.textContent=formatDuration(Math.floor((Date.now()-d.startedAt)/1000));const y=document.getElementById('restTotalLabel');if(y)y.innerHTML=`Descanso realizado: <span style="color:#a855f7;">${formatDuration(restTotalForDraft())}</span> / <span style="color:#7c3aed;">${formatDuration(d.scheduledRestTotal||0)}</span> programado`},1000)}
 function stopTotalTimer(){if(totalTimerId)clearInterval(totalTimerId);totalTimerId=null}
 function formatDuration(n){n=Math.max(0,Math.floor(n));const h=Math.floor(n/3600),m=Math.floor((n%3600)/60),s=n%60;if(h)return `${h}h ${m}min`;if(m)return `${m}min ${String(s).padStart(2,'0')}s`;return `00:${String(s).padStart(2,'0')}`}
 function fmt(n){n=Math.max(0,Math.floor(n));return String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0')}
@@ -1161,8 +1164,8 @@ function renderExerciseEvoDetails(workoutKey, exName) {
         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; font-size:13px;">
             <div>Carga Máxima:<br><strong style="font-size:18px; color:#a855f7;">${bestKg} kg</strong></div>
             <div>Recorde 1RM (Força):<br><strong style="font-size:18px; color:#a855f7;">~${maxOneRM} kg</strong></div>
-            <div>Último Treino:<br><strong style="color:#00f3ff;">${latest.kg} kg × ${latest.reps}</strong></div>
-            <div>Último 1RM Estim.:<br><strong style="color:#00f3ff;">~${latest.oneRM} kg</strong></div>
+            <div>Último Treino:<br><strong style="color:#c084fc;">${latest.kg} kg × ${latest.reps}</strong></div>
+            <div>Último 1RM Estim.:<br><strong style="color:#c084fc;">~${latest.oneRM} kg</strong></div>
         </div>
     </div>
 
@@ -1287,7 +1290,7 @@ function recordsScreen(filterWorkout = 'ALL'){
                 </div>
                 <div style="text-align:right;">
                     <div style="font-size:18px; font-weight:bold; color:#a855f7;">${pr.kg} kg</div>
-                    <div style="font-size:11px; color:#aaa;">${pr.reps} reps <span style="color:#00f3ff;">(1RM ~${pr.est1RM}kg)</span></div>
+                    <div style="font-size:11px; color:#aaa;">${pr.reps} reps <span style="color:#c084fc;">(1RM ~${pr.est1RM}kg)</span></div>
                 </div>
             </div>`;
         });
