@@ -181,6 +181,13 @@ const save=()=>localStorage.setItem(KEY,JSON.stringify(db));
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2);
 const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 
+function toRoman(num) {
+    const map = [[1000,'M'],[900,'CM'],[500,'D'],[400,'CD'],[100,'C'],[90,'XC'],[50,'L'],[40,'XL'],[10,'X'],[9,'IX'],[5,'V'],[4,'IV'],[1,'I']];
+    let n = num, out = '';
+    for (const [val, sym] of map) { while (n >= val) { out += sym; n -= val; } }
+    return out;
+}
+
 function calculate1RM(kg, reps) {
     if (!kg || kg <= 0) return 0;
     if (!reps || reps <= 0) return kg;
@@ -344,7 +351,9 @@ function getUserStats(){
 function getAchievements() {
     const stats = getUserStats();
     const achievements = [
-        { id: 'rank_e', title: 'Rank E — Primeiro Despertar', desc: 'Complete seu 1º treino e desperte seu poder.', icon: '🗝️', current: stats.totalWorkouts, target: 1, unit: '' },
+        // Progressão de Caçador (treinos)
+        { id: 'despertar', title: 'Primeiro Despertar', desc: 'Complete seu 1º treino e desperte seu poder.', icon: '🗝️', current: stats.totalWorkouts, target: 1, unit: '' },
+        { id: 'rank_e', title: 'Caçador Rank E', desc: 'Complete 10 treinos.', icon: '🛡️', current: stats.totalWorkouts, target: 10, unit: '' },
         { id: 'rank_d', title: 'Caçador Rank D', desc: 'Complete 20 treinos.', icon: '🛡️', current: stats.totalWorkouts, target: 20, unit: '' },
         { id: 'rank_c', title: 'Caçador Rank C', desc: 'Complete 50 treinos.', icon: '🛡️', current: stats.totalWorkouts, target: 50, unit: '' },
         { id: 'rank_b', title: 'Caçador Rank B', desc: 'Complete 100 treinos.', icon: '⚔️', current: stats.totalWorkouts, target: 100, unit: '' },
@@ -353,8 +362,14 @@ function getAchievements() {
         { id: 'rank_nacional', title: 'Caçador Rank Nacional', desc: 'Complete 400 treinos.', icon: '🎖️', current: stats.totalWorkouts, target: 400, unit: '' },
         { id: 'monarch', title: 'Monarca das Sombras', desc: 'Complete 550 treinos (Anos de dedicação).', icon: '☠️', current: stats.totalWorkouts, target: 550, unit: '' },
         { id: 'absoluto', title: 'Ser Absoluto', desc: 'Complete 750 treinos. Além dos Monarcas e Governantes.', icon: '🌌', current: stats.totalWorkouts, target: 750, unit: '' },
-        { id: 'ant_soldier', title: 'Formiga Soldado', desc: 'Acumule 1.500 minutos de cardio.', icon: '🐜', current: Math.floor(stats.totalCardioMin), target: 1500, unit: ' min' },
-        { id: 'beru', title: 'Rei Formiga (Beru)', desc: 'Acumule 6.000 minutos de cardio.', icon: '🐜', current: Math.floor(stats.totalCardioMin), target: 6000, unit: ' min' }
+        // Hierarquia do Exército das Sombras (cardio)
+        { id: 'sombra_normal', title: 'Sombra Normal / Básico', desc: 'Soldado raso recém-extraído. Acumule 300 minutos de cardio.', icon: '🪖', current: Math.floor(stats.totalCardioMin), target: 300, unit: ' min' },
+        { id: 'sombra_elite', title: 'Sombra Elite', desc: 'Soldado de destaque tático. Acumule 800 minutos de cardio.', icon: '🗡️', current: Math.floor(stats.totalCardioMin), target: 800, unit: ' min' },
+        { id: 'sombra_cavaleiro', title: 'Cavaleiro das Sombras', desc: 'Sub-liderança com nome próprio. Acumule 1.600 minutos de cardio.', icon: '♞', current: Math.floor(stats.totalCardioMin), target: 1600, unit: ' min' },
+        { id: 'sombra_cavaleiro_elite', title: 'Cavaleiro de Elite', desc: 'Guerreiro equiparável a Rank S. Acumule 2.800 minutos de cardio.', icon: '♘', current: Math.floor(stats.totalCardioMin), target: 2800, unit: ' min' },
+        { id: 'sombra_general', title: 'General das Sombras', desc: 'Alto escalão do exército. Acumule 4.200 minutos de cardio.', icon: '⭐', current: Math.floor(stats.totalCardioMin), target: 4200, unit: ' min' },
+        { id: 'sombra_marechal', title: 'Marechal das Sombras', desc: 'Rivaliza com Nível Nacional. Acumule 6.000 minutos de cardio.', icon: '🎖️', current: Math.floor(stats.totalCardioMin), target: 6000, unit: ' min' },
+        { id: 'sombra_grande_marechal', title: 'Grande Marechal (Bellion)', desc: 'O rank mais alto do exército das sombras. Acumule 8.500 minutos de cardio.', icon: '🐉', current: Math.floor(stats.totalCardioMin), target: 8500, unit: ' min' }
     ];
 
     let unlockedCount = 0;
@@ -373,16 +388,15 @@ function achievementsScreen() {
 
     let html = `<div class="app">${header('Conquistas & Sombras')}
     <div class="card" style="background: linear-gradient(135deg, rgba(20,15,35,0.95), rgba(10,8,20,0.98)); border: 1px solid #8a2be2; margin-bottom: 20px; text-align:center;">
-        <div style="font-size: 32px; margin-bottom:4px;">☠️</div>
         <div style="font-size: 20px; font-weight: bold; color: #fff;">Exército de Sombras & Ranks</div>
         <div style="font-size: 13px; color: #a855f7; margin-top: 4px; font-weight:bold;">${unlockedCount} de ${totalCount} Desbloqueados</div>
     </div>
     <div style="display:flex; flex-direction:column; gap:12px;">`;
 
-    achievements.forEach(a => {
+    achievements.forEach((a, idx) => {
         const pct = Math.min(100, Math.floor((a.current / a.target) * 100));
-        html += `<div class="card" style="display:flex; gap:12px; align-items:center; border: 1px solid ${a.unlocked ? '#a855f7' : 'rgba(255,255,255,0.1)'}; background: ${a.unlocked ? 'rgba(168, 85, 247, 0.08)' : 'rgba(15,12,25,0.6)'}">
-            <div style="font-size:36px; opacity:${a.unlocked ? '1' : '0.3'}">${a.icon}</div>
+        html += `<div class="card" style="display:flex; gap:14px; align-items:center; border: 1px solid ${a.unlocked ? '#a855f7' : 'rgba(255,255,255,0.1)'}; background: ${a.unlocked ? 'rgba(168, 85, 247, 0.08)' : 'rgba(15,12,25,0.6)'}">
+            <div style="min-width:38px; height:38px; display:flex; align-items:center; justify-content:center; border:1px solid ${a.unlocked ? '#a855f7' : 'rgba(255,255,255,0.2)'}; border-radius:6px; font-size:13px; font-weight:800; letter-spacing:0.5px; color:${a.unlocked ? '#a855f7' : '#666'};">${toRoman(idx + 1)}</div>
             <div style="flex:1;">
                 <div style="display:flex; justify-content:space-between; align-items:baseline;">
                     <strong style="font-size:15px; color:${a.unlocked ? '#a855f7' : '#fff'}">${esc(a.title)}</strong>
@@ -729,9 +743,9 @@ function renderWorkout(){
         <div><small style="font-size:10px; font-weight:bold; color:#aaa;">TEMPORIZADOR DE DESCANSO</small><br><strong id="globalRestClock">00:00</strong></div>
         <div class="global-rest-actions" style="display:flex; gap:6px; align-items:center;">
             <button class="mini" onclick="setGlobalRest(45)">45s</button>
-            <button class="mini" onclick="setGlobalRest(60)">1m</button>
-            <button class="mini" onclick="setGlobalRest(120)">2m</button>
-            <button class="mini" onclick="setGlobalRest(180)">3m</button>
+            <button class="mini" onclick="setGlobalRest(60)">1min</button>
+            <button class="mini" onclick="setGlobalRest(120)">2min</button>
+            <button class="mini" onclick="setGlobalRest(180)">3min</button>
             <button class="mini start" onclick="startGlobalRest()">Iniciar</button>
         </div>
     </div>`;
