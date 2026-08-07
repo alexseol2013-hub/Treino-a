@@ -42,25 +42,19 @@ E:{name:'Treino E',desc:'Bíceps, costas e abdômen',mob:'Mobilidade de ombros e
 ['Abdominal supra na prancha declinada',[['Trabalho','3','RM','45 s']], '3x RM (máximo de repetições possíveis) · intervalo 1 min'] ]}
 };
 
-const KEY='solo_leveling_v13';
+const KEY='solo_leveling_v14';
 
 let db;
 try {
     db = JSON.parse(localStorage.getItem(KEY)) || null;
 } catch (e) {
-    console.error("Erro ao ler localStorage, reiniciando estado:", e);
     db = null;
 }
-db = db || {history:[],drafts:{},user:{name:'Alexsandro'},restState:{deadline:0,total:0,startedAt:0}};
+db = db || {history:[],drafts:{},user:{name:'Sung Jin-Woo'},restState:{deadline:0,total:0,startedAt:0}};
 
 let screen='home',current=null,timerId=null,totalTimerId=null;
-
-let currentEvolutionMetric = 'kg'; 
-let currentEvolutionFilter = 'ALL';
-let currentRecordsFilter = 'ALL';
-let searchFilterQuery = '';
+let selectedExEvo = null;
 let activeChartInstance = null;
-
 let wakeLock = null;
 const app=document.getElementById('app');
 
@@ -115,9 +109,9 @@ function playBeep() {
     } catch(e) {}
 }
 
-if(!document.getElementById('monarch-pr-styles')){
+if(!document.getElementById('solo-leveling-enhanced-styles')){
     const styleEl = document.createElement('style');
-    styleEl.id = 'monarch-pr-styles';
+    styleEl.id = 'solo-leveling-enhanced-styles';
     styleEl.textContent = `
         @keyframes prMonarchPulse {
             0% { transform: scale(1); box-shadow: 0 0 8px rgba(168,85,247,0.4); }
@@ -125,30 +119,41 @@ if(!document.getElementById('monarch-pr-styles')){
             100% { transform: scale(1); box-shadow: 0 0 8px rgba(168,85,247,0.4); }
         }
         .pr-badge-live {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            background: rgba(168, 85, 247, 0.15);
-            border: 1px solid #a855f7;
-            color: #a855f7;
-            padding: 4px 10px;
-            border-radius: 6px;
-            font-size: 13px;
-            font-weight: 800;
-            letter-spacing: 0.5px;
-            animation: prMonarchPulse 1.6s infinite ease-in-out;
-            text-transform: uppercase;
+            display: inline-flex; align-items: center; gap: 4px; background: rgba(168, 85, 247, 0.18);
+            border: 1px solid #a855f7; color: #a855f7; padding: 4px 10px; border-radius: 6px;
+            font-size: 12px; font-weight: 800; animation: prMonarchPulse 1.6s infinite ease-in-out; text-transform: uppercase;
         }
-        .tech { font-size: 14px !important; font-weight: bold; color: #a855f7; margin-top: 6px; }
-        .tech-inline { font-size: 13px !important; font-weight: bold; color: #8a2be2; margin-top: 4px; }
-        .group-label { font-size: 16px !important; font-weight: bold; color: #a855f7; margin: 12px 0 6px 0; }
-        .group-label span { font-size: 14px !important; color: #ddd; font-weight: normal; }
-        .total-bottom { margin-bottom: 120px !important; border: 2px solid rgba(168,85,247,0.4) !important; padding: 18px !important; }
+        input:focus, textarea:focus {
+            outline: none !important; border-color: #a855f7 !important;
+            box-shadow: 0 0 10px rgba(168, 85, 247, 0.6) !important;
+        }
+        .home-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+        .home-card-btn {
+            background: rgba(20, 16, 35, 0.85); border: 1px solid rgba(168, 85, 247, 0.3);
+            border-radius: 12px; padding: 14px; text-align: left; display: flex; flex-direction: column;
+            justify-content: space-between; transition: all 0.2s ease; cursor: pointer; color: #fff;
+        }
+        .home-card-btn:active { transform: scale(0.98); background: rgba(168, 85, 247, 0.2); }
+        .home-card-btn .icon { font-size: 24px; margin-bottom: 6px; }
+        .home-card-btn .title { font-size: 14px; font-weight: bold; color: #e0e0e0; }
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85); backdrop-filter: blur(4px); z-index: 9999;
+            display: flex; align-items: center; justify-content: center; animation: fadeIn 0.2s;
+        }
+        .modal-box {
+            background: #0d0b18; border: 1px solid #a855f7; border-radius: 16px;
+            padding: 20px; width: 90%; max-width: 420px; box-shadow: 0 0 30px rgba(168, 85, 247, 0.4); max-height: 85vh; overflow-y: auto;
+        }
+        .tech { font-size: 13px !important; font-weight: bold; color: #a855f7; margin-top: 4px; }
+        .group-label { font-size: 15px !important; font-weight: bold; color: #a855f7; margin: 12px 0 6px 0; }
+        .group-label span { font-size: 13px !important; color: #bbb; font-weight: normal; }
+        .total-bottom { margin-bottom: 120px !important; border: 2px solid rgba(168,85,247,0.4) !important; padding: 16px !important; border-radius: 12px; background: rgba(15,12,25,0.8); }
         .total-bottom strong#totalTime { font-size: 28px !important; color: #a855f7; }
-        .global-rest { padding: 12px 14px !important; min-height: 80px; }
-        .global-rest strong#globalRestClock { font-size: 28px !important; color: #a855f7; }
-        .global-rest-actions button.mini { font-size: 14px !important; padding: 10px 14px !important; font-weight: bold !important; border-radius: 8px !important; }
-        .global-rest-actions button.mini.start { font-size: 15px !important; padding: 10px 18px !important; background: linear-gradient(135deg, #8a2be2, #a855f7) !important; }
+        .global-rest { padding: 10px 14px !important; min-height: 75px; background: #0b0914; border-top: 2px solid #a855f7; }
+        .global-rest strong#globalRestClock { font-size: 26px !important; color: #a855f7; }
+        .global-rest-actions button.mini { font-size: 13px !important; padding: 8px 12px !important; font-weight: bold !important; border-radius: 6px !important; }
+        .global-rest-actions button.mini.start { font-size: 14px !important; padding: 8px 16px !important; background: linear-gradient(135deg, #8a2be2, #a855f7) !important; color: #fff; }
     `;
     document.head.appendChild(styleEl);
 }
@@ -156,6 +161,32 @@ if(!document.getElementById('monarch-pr-styles')){
 const save=()=>localStorage.setItem(KEY,JSON.stringify(db));
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2);
 const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+
+function formatVolume(kg) {
+    if (kg >= 10000) {
+        return (kg / 1000).toFixed(1).replace('.', ',') + ' t';
+    }
+    return kg.toLocaleString('pt-BR') + ' kg';
+}
+
+function showConfirmModal(title, text, onConfirm) {
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+        <div class="modal-box" style="text-align:center;">
+            <div style="font-size:36px; margin-bottom:8px;">⚠️</div>
+            <h3 style="color:#a855f7; margin:0 0 10px 0; font-size:18px;">${esc(title)}</h3>
+            <p style="color:#ccc; font-size:14px; margin-bottom:20px;">${esc(text)}</p>
+            <div style="display:flex; gap:10px;">
+                <button class="secondary" style="flex:1; padding:12px;" id="modalCancelBtn">Cancelar</button>
+                <button class="primary" style="flex:1; padding:12px; background:linear-gradient(135deg, #8a2be2, #a855f7);" id="modalConfirmBtn">Confirmar</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    document.getElementById('modalCancelBtn').onclick = () => modal.remove();
+    document.getElementById('modalConfirmBtn').onclick = () => { modal.remove(); onConfirm(); };
+}
 
 function toast(t){const x=document.createElement('div');x.className='toast';x.textContent=t;document.body.appendChild(x);setTimeout(()=>x.remove(),1800)}
 function header(title,homeBack=true){return `<div class="top"><div class="brand">SOLO LEVELING</div><button class="iconbtn" onclick="${homeBack?'goHome()':'settingsScreen()'}">${homeBack?'‹':'⚙'}</button></div><h1 class="screen-title">${title}</h1>`}
@@ -186,20 +217,20 @@ function getRelativeDate(isoString){
 }
 
 function getRankTitle(level) {
-    if (level >= 1000) return "Ser Absoluto";
-    if (level >= 500)  return "Monarca";
-    if (level >= 250)  return "Rank Nacional";
-    if (level >= 100)  return "Rank S";
-    if (level >= 75)   return "Rank A";
-    if (level >= 50)   return "Rank B";
-    if (level >= 30)   return "Rank C";
-    if (level >= 15)   return "Rank D";
-    if (level >= 5)    return "Rank E";
-    return "Iniciante";
+    if (level >= 1000) return "Monarca das Sombras";
+    if (level >= 500)  return "Comandante de Sombras";
+    if (level >= 250)  return "Caçador Rank Nacional";
+    if (level >= 100)  return "Caçador Rank S";
+    if (level >= 75)   return "Caçador Rank A";
+    if (level >= 50)   return "Caçador Rank B";
+    if (level >= 30)   return "Caçador Rank C";
+    if (level >= 15)   return "Caçador Rank D";
+    if (level >= 5)    return "Caçador Rank E";
+    return "Iniciante / Humano";
 }
 
 function getRequiredXPForLevel(lvl) {
-    return Math.floor(100 * Math.pow(lvl, 2.1));
+    return Math.floor(120 * Math.pow(lvl, 1.95));
 }
 
 function getUserStats(){
@@ -207,26 +238,44 @@ function getUserStats(){
     let totalXP = 0;
     let totalVolume = 0;
     let totalCardioMin = 0;
-    let totalCardioSessions = 0;
-    let maxKgGlobal = 0;
+    let totalSetsDone = 0;
+    let totalPRsCount = 0;
 
-    db.history.forEach(r => {
+    const prTracker = {};
+
+    db.history.slice().sort((a,b)=>new Date(a.date)-new Date(b.date)).forEach(r => {
         const cardioMin = parseFloat(r.data?.cardio?.time) || 0;
-        if (cardioMin > 0) totalCardioSessions++;
         const vol = (r.totalVolume || 0);
         totalVolume += vol;
         totalCardioMin += cardioMin;
 
-        totalXP += 200 + Math.floor(cardioMin) + Math.floor(vol / 50);
+        totalXP += 200 + Math.floor(cardioMin * 3);
 
         const wData = DATA[r.workout];
         if(wData){
             wData.ex.forEach((exInfo, i) => {
+                let exCompleted = true;
                 expandedGroups(exInfo[1]).forEach((_, j) => {
                     const setData = r.data?.sets?.[`${r.workout}-${i}-${j}`] || {};
-                    const kg = parseFloat(setData.kg) || 0;
-                    if(kg > maxKgGlobal) maxKgGlobal = kg;
+                    if(setData.done) {
+                        totalSetsDone++;
+                        totalXP += 15;
+                        const kg = parseFloat(setData.kg) || 0;
+                        const reps = parseInt(setData.reps) || 0;
+                        const exKey = exInfo[0];
+                        if (kg > 0) {
+                            const prevBest = prTracker[exKey] || { kg: 0, reps: 0 };
+                            if (kg > prevBest.kg || (kg === prevBest.kg && reps > prevBest.reps)) {
+                                prTracker[exKey] = { kg, reps };
+                                totalPRsCount++;
+                                totalXP += 300; 
+                            }
+                        }
+                    } else {
+                        exCompleted = false;
+                    }
                 });
+                if(exCompleted) totalXP += 60;
             });
         }
     });
@@ -240,36 +289,27 @@ function getUserStats(){
 
     const nextLevelReq = getRequiredXPForLevel(level);
     const progressPct = Math.min(100, Math.floor((accumulatedXP / nextLevelReq) * 100));
-    const rank = getRankTitle(totalWorkouts);
+    const rank = getRankTitle(level);
     const lastWorkout = db.history.length ? db.history[db.history.length - 1].date : null;
 
     return { 
-        level, 
-        rank,
-        currentLevelXP: accumulatedXP, 
-        nextLevelReq, 
-        progressPct, 
-        totalWorkouts, 
-        totalCardioSessions,
-        lastWorkoutDateStr: getRelativeDate(lastWorkout), 
-        totalVolume, 
-        totalCardioMin, 
-        maxKgGlobal 
+        level, rank, currentLevelXP: accumulatedXP, nextLevelReq, progressPct, 
+        totalWorkouts, totalSetsDone, totalPRsCount, lastWorkoutDateStr: getRelativeDate(lastWorkout), 
+        totalVolume, totalCardioMin 
     };
 }
 
 function getAchievements() {
     const stats = getUserStats();
     const achievements = [
-        { id: 'rank_e', title: 'Rank E', desc: 'Alcance 5 treinos concluídos.', icon: '🛡️', current: stats.totalWorkouts, target: 5 },
-        { id: 'rank_d', title: 'Rank D', desc: 'Alcance 15 treinos concluídos + 5 cardios.', icon: '⚔️', current: stats.totalWorkouts + stats.totalCardioSessions, target: 20 },
-        { id: 'rank_c', title: 'Rank C', desc: 'Alcance 30 treinos concluídos + 10 cardios.', icon: '⚡', current: stats.totalWorkouts + stats.totalCardioSessions, target: 40 },
-        { id: 'rank_b', title: 'Rank B', desc: 'Alcance 50 treinos concluídos + 20 cardios.', icon: '🔥', current: stats.totalWorkouts + stats.totalCardioSessions, target: 70 },
-        { id: 'rank_a', title: 'Rank A', desc: 'Alcance 75 treinos concluídos + 35 cardios.', icon: '🔮', current: stats.totalWorkouts + stats.totalCardioSessions, target: 110 },
-        { id: 'rank_s', title: 'Rank S', desc: 'Alcance 100 treinos concluídos + 50 cardios.', icon: '👑', current: stats.totalWorkouts + stats.totalCardioSessions, target: 150 },
-        { id: 'rank_nacional', title: 'Rank Nacional', desc: 'Alcance 250 treinos concluídos + 100 cardios.', icon: '🌟', current: stats.totalWorkouts + stats.totalCardioSessions, target: 350 },
-        { id: 'rank_monarca', title: 'Rank Monarca', desc: 'Alcance 500 treinos concluídos + 200 cardios.', icon: '☠️', current: stats.totalWorkouts + stats.totalCardioSessions, target: 700 },
-        { id: 'rank_absoluto', title: 'Rank Ser Absoluto', desc: 'Alcance 1000 treinos concluídos + 500 cardios.', icon: '🌌', current: stats.totalWorkouts + stats.totalCardioSessions, target: 1500 }
+        { id: 'rank_e', title: 'Erguer-se (Rank E)', desc: 'Complete seu 1º treino e entre na Dungeon.', icon: '🗝️', current: stats.totalWorkouts, target: 1 },
+        { id: 'igris', title: 'Sombra de Igris', desc: 'Quebre 5 Recordes Pessoais (PRs).', icon: '🗡️', current: stats.totalPRsCount, target: 5 },
+        { id: 'rank_c', title: 'Caçador Rank C', desc: 'Complete 15 treinos e 50 séries.', icon: '🛡️', current: stats.totalWorkouts, target: 15 },
+        { id: 'tank', title: 'Sombra de Tank', desc: 'Mova mais de 25.000 kg de volume total.', icon: '🐻', current: stats.totalVolume, target: 25000 },
+        { id: 'rank_a', title: 'Caçador Rank A', desc: 'Alcance Nível 25 e 50 treinos finalizados.', icon: '🔮', current: stats.level, target: 25 },
+        { id: 'beru', title: 'Rei Formiga (Beru)', desc: 'Acumule 300 minutos de cardio.', icon: '🐜', current: Math.floor(stats.totalCardioMin), target: 300 },
+        { id: 'rank_s', title: 'Caçador Rank S', desc: 'Alcance Nível 50 na sua jornada.', icon: '👑', current: stats.level, target: 50 },
+        { id: 'monarch', title: 'Monarca das Sombras', desc: 'Conclua 100 treinos no sistema.', icon: '☠️', current: stats.totalWorkouts, target: 100 }
     ];
 
     let unlockedCount = 0;
@@ -286,11 +326,11 @@ function achievementsScreen() {
     screen = 'achievements';
     const { achievements, unlockedCount, totalCount } = getAchievements();
 
-    let html = `<div class="app">${header('Conquistas & Ranks')}
+    let html = `<div class="app">${header('Conquistas & Sombras')}
     <div class="card" style="background: linear-gradient(135deg, rgba(20,15,35,0.95), rgba(10,8,20,0.98)); border: 1px solid #8a2be2; margin-bottom: 20px; text-align:center;">
-        <div style="font-size: 32px; margin-bottom:4px;">🎖️</div>
-        <div style="font-size: 20px; font-weight: bold; color: #fff;">Escala de Ranks do Caçador</div>
-        <div style="font-size: 13px; color: #a855f7; margin-top: 4px; font-weight:bold;">${unlockedCount} de ${totalCount} Conquistados</div>
+        <div style="font-size: 32px; margin-bottom:4px;">☠️</div>
+        <div style="font-size: 20px; font-weight: bold; color: #fff;">Exército de Sombras & Ranks</div>
+        <div style="font-size: 13px; color: #a855f7; margin-top: 4px; font-weight:bold;">${unlockedCount} de ${totalCount} Desbloqueados</div>
     </div>
     <div style="display:flex; flex-direction:column; gap:12px;">`;
 
@@ -300,8 +340,8 @@ function achievementsScreen() {
             <div style="font-size:36px; opacity:${a.unlocked ? '1' : '0.3'}">${a.icon}</div>
             <div style="flex:1;">
                 <div style="display:flex; justify-content:space-between; align-items:baseline;">
-                    <strong style="font-size:16px; color:${a.unlocked ? '#a855f7' : '#fff'}">${esc(a.title)}</strong>
-                    ${a.unlocked ? `<span style="font-size:10px; color:#a855f7; font-weight:bold; border:1px solid #a855f7; padding:2px 6px; border-radius:4px;">DESBLOQUEADO</span>` : `<span style="font-size:11px; color:#aaa;">${a.current}/${a.target}</span>`}
+                    <strong style="font-size:15px; color:${a.unlocked ? '#a855f7' : '#fff'}">${esc(a.title)}</strong>
+                    ${a.unlocked ? `<span style="font-size:10px; color:#a855f7; font-weight:bold; border:1px solid #a855f7; padding:2px 6px; border-radius:4px;">DESBLOQUEADO</span>` : `<span style="font-size:11px; color:#aaa;">${typeof a.current==='number'&&a.current>1000?formatVolume(a.current):a.current}/${typeof a.target==='number'&&a.target>=1000?formatVolume(a.target):a.target}</span>`}
                 </div>
                 <div class="muted" style="font-size:12px; margin-top:2px;">${esc(a.desc)}</div>
                 ${!a.unlocked ? `
@@ -327,15 +367,15 @@ async function requestNotifications(){try{if('Notification' in window&&Notificat
 
 function showRestAlertModal() {
     const div = document.createElement('div');
+    div.className = 'modal-overlay';
     div.innerHTML = `
-        <div style="background:#0b0a12; padding:35px 20px; border-radius:16px; border:2px solid #a855f7; text-align:center; width:90%; max-width:350px; box-shadow: 0 0 35px rgba(168, 85, 247, 0.6);">
-            <div style="font-size:50px; margin-bottom:10px;">💪</div>
-            <h2 style="color:#a855f7; margin:0 0 10px 0; font-size:22px; font-weight:800;">FIM DO DESCANSO!</h2>
-            <p style="color:#e0e0e0; margin-bottom:25px; font-size:15px; line-height:1.4;">Hora de subir de nível. Volte para a próxima série!</p>
+        <div class="modal-box" style="text-align:center;">
+            <div style="font-size:50px; margin-bottom:10px;">⚔️</div>
+            <h2 style="color:#a855f7; margin:0 0 10px 0; font-size:22px; font-weight:800;">TEMPO DE DESCANSO CONCLUÍDO!</h2>
+            <p style="color:#e0e0e0; margin-bottom:20px; font-size:14px; line-height:1.4;">Prepare-se para a próxima série. Suba de nível!</p>
             <button class="primary" style="width:100%; padding:14px; font-size:16px; font-weight:bold; background: linear-gradient(135deg, #8a2be2, #a855f7);" onclick="this.parentElement.parentElement.remove()">ESTOU PRONTO</button>
         </div>
     `;
-    div.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:99999; display:flex; align-items:center; justify-content:center; animation: fadeIn 0.3s;';
     document.body.appendChild(div);
 }
 
@@ -343,7 +383,7 @@ function notifyRestDone(){
     playBeep();
     navigator.vibrate?.([500,200,500,200,800]);
     if('Notification' in window && Notification.permission==='granted'){
-        try{ new Notification('Solo Leveling',{body:'⏱️ Descanso concluído! Hora de subir de nível.',icon:'icon.svg',tag:'solo-rest'}); }catch(e){}
+        try{ new Notification('Solo Leveling',{body:'⏱️ Descanso concluído! Hora de voltar para a série.',icon:'icon.svg',tag:'solo-rest'}); }catch(e){}
     }
     showRestAlertModal();
 }
@@ -353,39 +393,99 @@ function home(){
     screen='home';
     const stats = getUserStats();
     const { unlockedCount, totalCount } = getAchievements();
+    const weekly = getWeeklyComparison();
     
     app.innerHTML=`<div class="app">${header('Painel do Caçador', false)}
-    <div class="card" style="background: linear-gradient(135deg, rgba(20,15,35,0.95), rgba(10,8,20,0.98)); border: 1px solid #a855f7; box-shadow: 0 0 25px rgba(168, 85, 247, 0.25); border-radius: 12px; padding: 16px; margin-bottom: 20px;">
-        <div style="font-size: 13px; color: #a855f7; text-transform: uppercase; letter-spacing: 1.5px; font-weight:bold;">${esc(stats.rank)}</div>
+    <div class="card" style="background: linear-gradient(135deg, rgba(20,15,35,0.95), rgba(10,8,20,0.98)); border: 1px solid #a855f7; box-shadow: 0 0 25px rgba(168, 85, 247, 0.25); border-radius: 12px; padding: 16px; margin-bottom: 15px;">
+        <div style="font-size: 12px; color: #a855f7; text-transform: uppercase; letter-spacing: 1.5px; font-weight:bold;">${esc(stats.rank)}</div>
         <div style="font-size: 22px; font-weight: bold; color: #fff; margin-top: 2px;">${getGreeting()}, ${esc(db.user.name)}</div>
-        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 15px;">
-            <span style="font-size: 18px; font-weight: bold; color: #a855f7;">Nível ${stats.level}</span>
-            <span style="font-size: 13px; color: #a855f7; font-weight:bold;">XP: ${stats.currentLevelXP} / ${stats.nextLevelReq}</span>
+        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 12px;">
+            <span style="font-size: 16px; font-weight: bold; color: #a855f7;">Nível ${stats.level}</span>
+            <span style="font-size: 12px; color: #a855f7; font-weight:bold;">XP: ${stats.currentLevelXP} / ${stats.nextLevelReq}</span>
         </div>
-        <div style="width: 100%; background: rgba(255,255,255,0.08); height: 10px; border-radius: 5px; overflow: hidden; margin-top: 6px; border: 1px solid rgba(168,85,247,0.3);">
+        <div style="width: 100%; background: rgba(255,255,255,0.08); height: 8px; border-radius: 4px; overflow: hidden; margin-top: 6px; border: 1px solid rgba(168,85,247,0.3);">
             <div style="width: ${stats.progressPct}%; background: linear-gradient(90deg, #6366f1, #8a2be2, #a855f7); height: 100%; transition: width 0.3s;"></div>
         </div>
-        <div style="display: flex; justify-content: space-between; margin-top: 16px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.08); font-size: 13px;">
-            <div><span style="color: #888;">Treinos Concluídos:</span> <strong style="color:#fff;">${stats.totalWorkouts}</strong></div>
-            <div><span style="color: #888;">Último Treino:</span> <strong style="color:#a855f7;">${stats.lastWorkoutDateStr}</strong></div>
+    </div>
+
+    <div class="card" style="background: rgba(138, 43, 226, 0.08); border: 1px solid rgba(168, 85, 247, 0.3); margin-bottom: 15px; padding: 14px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <span style="font-size:13px; font-weight:bold; color:#a855f7; text-transform:uppercase;">🎯 Missão Semanal</span>
+            <span style="font-size:11px; font-weight:bold; color:${weekly.volDiffPct>=0?'#a855f7':'#ef4444'};">${weekly.volDiffPct>=0?'↑ +':'↓ '}${weekly.volDiffPct}% Vol. vs sem. anterior</span>
+        </div>
+        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px; text-align:center; background:rgba(0,0,0,0.3); padding:8px; border-radius:8px;">
+            <div><small style="font-size:10px; color:#aaa;">Treinos</small><br><strong style="font-size:14px; color:#fff;">${weekly.thisWeekCount}</strong></div>
+            <div><small style="font-size:10px; color:#aaa;">Volume</small><br><strong style="font-size:14px; color:#a855f7;">${formatVolume(weekly.thisWeekVolRaw)}</strong></div>
+            <div><small style="font-size:10px; color:#aaa;">Cardio</small><br><strong style="font-size:14px; color:#fff;">${weekly.thisWeekCardio}m</strong></div>
         </div>
     </div>
-    <div style="display: flex; flex-direction: column; gap: 10px;">
-        <button class="primary" style="padding: 18px; font-size: 18px; font-weight: bold; text-align: left; background: linear-gradient(135deg, #8a2be2, #a855f7);" onclick="selectWorkoutScreen()">⚔️ Treinar Agora</button>
-        <button class="secondary" style="text-align: left; padding: 14px;" onclick="historyScreen()">📈 Histórico e Estatísticas</button>
-        <button class="secondary" style="text-align: left; padding: 14px;" onclick="evolutionScreen(currentEvolutionFilter)">📊 Evolução de Cargas & Volume</button>
-        <button class="secondary" style="text-align: left; padding: 14px;" onclick="recordsScreen(currentRecordsFilter)">🏆 Recordes Pessoais (PRs)</button>
-        <button class="secondary" style="text-align: left; padding: 14px; display:flex; justify-content:space-between; align-items:center;" onclick="achievementsScreen()"><span>🎖️ Conquistas & Ranks</span><span style="font-size:12px; color:#a855f7; font-weight:bold;">${unlockedCount}/${totalCount}</span></button>
-        <button class="secondary" style="text-align: left; padding: 14px;" onclick="settingsScreen()">⚙️ Configurações</button>
-        <button class="secondary" style="text-align: left; padding: 14px;" onclick="pdfScreen()">📄 Planilha / PDF</button>
+
+    <button class="primary" style="padding: 16px; font-size: 18px; font-weight: bold; width:100%; text-align: center; background: linear-gradient(135deg, #8a2be2, #a855f7); box-shadow: 0 0 15px rgba(138,43,226,0.4);" onclick="selectWorkoutScreen()">⚔️ TREINAR AGORA</button>
+
+    <div class="home-grid">
+        <div class="home-card-btn" onclick="historyScreen()">
+            <div class="icon">📈</div>
+            <div>
+                <div class="title">Histórico</div>
+                <small style="font-size:11px; color:#aaa;">Diário de Treinos</small>
+            </div>
+        </div>
+        <div class="home-card-btn" onclick="evolutionScreen()">
+            <div class="icon">📊</div>
+            <div>
+                <div class="title">Evolução</div>
+                <small style="font-size:11px; color:#aaa;">Por Exercício</small>
+            </div>
+        </div>
+        <div class="home-card-btn" onclick="recordsScreen(currentRecordsFilter)">
+            <div class="icon">🏆</div>
+            <div>
+                <div class="title">Recordes</div>
+                <small style="font-size:11px; color:#aaa;">Seus PRs</small>
+            </div>
+        </div>
+        <div class="home-card-btn" onclick="achievementsScreen()">
+            <div class="icon">☠️</div>
+            <div>
+                <div class="title">Conquistas</div>
+                <small style="font-size:11px; color:#a855f7;">${unlockedCount}/${totalCount} Unlocked</small>
+            </div>
+        </div>
+        <div class="home-card-btn" onclick="settingsScreen()">
+            <div class="icon">⚙️</div>
+            <div>
+                <div class="title">Ajustes</div>
+                <small style="font-size:11px; color:#aaa;">Perfil & Dados</small>
+            </div>
+        </div>
+        <div class="home-card-btn" onclick="pdfScreen()">
+            <div class="icon">📄</div>
+            <div>
+                <div class="title">Planilha</div>
+                <small style="font-size:11px; color:#aaa;">PDF Original</small>
+            </div>
+        </div>
     </div>
     </div>`;
+}
+
+function getLastWorkoutDateFor(workoutKey) {
+    const history = db.history.slice().sort((a,b)=>new Date(b.date)-new Date(a.date));
+    const rec = history.find(r => r.workout === workoutKey);
+    return rec ? getRelativeDate(rec.date) : 'Nunca realizado';
 }
 
 function selectWorkoutScreen(){
     app.innerHTML=`<div class="app">${header('Escolha seu treino')}
     <p class="muted">Segunda A · Terça B · Quarta C · Quinta descanso · Sexta D · Sábado E · Domingo descanso.</p>
-    <div class="grid" style="margin-top:15px">${Object.entries(DATA).map(([k,v])=>`<button class="day" onclick="openWorkout('${k}')"><strong>${v.name}</strong><span>${v.desc}</span><small>${v.ex.length} exercícios</small></button>`).join('')}</div>
+    <div class="grid" style="margin-top:15px">${Object.entries(DATA).map(([k,v])=>{
+        const lastDate = getLastWorkoutDateFor(k);
+        return `<button class="day" onclick="openWorkout('${k}')">
+            <strong>${v.name}</strong>
+            <span>${v.desc}</span>
+            <small style="color:#a855f7; font-weight:bold; margin-top:4px;">Último: ${lastDate}</small>
+        </button>`;
+    }).join('')}</div>
     </div>`;
 }
 
@@ -453,10 +553,10 @@ function renderWorkout(){
 
     app.innerHTML=`<div class="app">${header(v.name)}
     <div class="muted">${v.desc} · ${v.mob}</div>
-    <div class="start-panel" style="padding:16px;">
+    <div class="start-panel" style="padding:14px; margin-top:10px;">
         <div><strong>${started?'Treino em andamento':'Treino não iniciado'}</strong>
-        <div class="muted" style="font-size:13px;">${started?'O tempo está contando.':'Quando estiver pronto, toque em iniciar.'}</div></div>
-        <button class="primary start-workout" style="font-size:16px; padding:12px 20px; background: linear-gradient(135deg, #8a2be2, #a855f7);" onclick="startWorkout()" ${started?'disabled':''}>${started?'✓ Iniciado':'▶ Iniciar'}</button>
+        <div class="muted" style="font-size:12px;">${started?'O tempo está a contar.':'Quando estiver pronto, toque em iniciar.'}</div></div>
+        <button class="primary start-workout" style="font-size:15px; padding:10px 18px; background: linear-gradient(135deg, #8a2be2, #a855f7);" onclick="startWorkout()" ${started?'disabled':''}>${started?'✓ Iniciado':'▶ Iniciar'}</button>
     </div>
     
     ${v.ex.map((ex,i)=>exerciseHTML(ex,i,d)).join('')}
@@ -474,15 +574,15 @@ function renderWorkout(){
     <div class="total-bottom">
         <div class="muted" style="font-size:12px; font-weight:bold; letter-spacing:1px; color:#a855f7;">TEMPO TOTAL DO TREINO</div>
         <strong id="totalTime">${started?formatDuration(Math.floor((Date.now()-d.startedAt)/1000)):'00:00'}</strong>
-        <div style="margin-top:8px; font-size:14px; color:#aaa;">Volume Total: <strong style="color:#a855f7; font-size:16px;">${metrics.totalVolume.toLocaleString('pt-BR')} kg</strong></div>
-        <div style="font-size:14px; color:#aaa;">Carga Somada Bruta: <strong style="color:#a855f7; font-size:16px;">${metrics.totalWeightRaw.toLocaleString('pt-BR')} kg</strong></div>
-        <div class="muted" id="restTotalLabel" style="margin-top:8px; font-size:13px; font-weight:bold; color:#e0e0e0; background:rgba(168,85,247,0.1); padding:8px; border-radius:6px; border:1px solid rgba(168,85,247,0.3);">
+        <div style="margin-top:8px; font-size:13px; color:#aaa;">Volume Total: <strong style="color:#a855f7; font-size:15px;">${formatVolume(metrics.totalVolume)}</strong></div>
+        <div style="font-size:13px; color:#aaa;">Carga Somada Bruta: <strong style="color:#a855f7; font-size:15px;">${formatVolume(metrics.totalWeightRaw)}</strong></div>
+        <div class="muted" id="restTotalLabel" style="margin-top:8px; font-size:12px; font-weight:bold; color:#e0e0e0; background:rgba(168,85,247,0.1); padding:8px; border-radius:6px; border:1px solid rgba(168,85,247,0.3);">
             Descanso realizado: <span style="color:#a855f7;">${formatDuration(restTotalForDraft())}</span> / <span style="color:#00f3ff;">${formatDuration(d.scheduledRestTotal||0)}</span> programado
         </div>
     </div></div>
     
     <div class="global-rest" id="globalRest">
-        <div><small style="font-size:11px; font-weight:bold; color:#aaa;">TEMPORIZADOR DE DESCANSO</small><br><strong id="globalRestClock">00:00</strong></div>
+        <div><small style="font-size:10px; font-weight:bold; color:#aaa;">TEMPORIZADOR DE DESCANSO</small><br><strong id="globalRestClock">00:00</strong></div>
         <div class="global-rest-actions" style="display:flex; gap:6px; align-items:center;">
             <button class="mini" onclick="setGlobalRest(45)">45s</button>
             <button class="mini" onclick="setGlobalRest(60)">1m</button>
@@ -513,12 +613,12 @@ function exerciseHTML(ex,i,d){
     let lastGroup=-1;
     const pr = getExercisePR(current, i);
     
-    let html=`<div class="card" style="padding:16px;">
+    let html=`<div class="card" style="padding:14px; margin-top:12px;">
         <div class="exercise-head" style="display:flex; justify-content:space-between; align-items:center;">
-            <div class="exercise-name" style="flex:1; font-size:18px !important; font-weight:bold; color:#fff;">${i+1}. ${esc(name)}</div>
-            <button class="mini" type="button" style="margin-left:8px; font-size:12px; padding:6px 10px;" onclick="swapExercise(${i})">🔄 Trocar</button>
+            <div class="exercise-name" style="flex:1; font-size:16px !important; font-weight:bold; color:#fff;">${i+1}. ${esc(name)}</div>
+            <button class="mini" type="button" style="margin-left:8px; font-size:11px; padding:4px 8px;" onclick="swapExercise(${i})">🔄 Trocar</button>
         </div>
-        ${tech?`<div class="tech" style="font-size:14px; font-weight:bold; color:#a855f7; margin-top:6px;">⚡ ${esc(tech)}</div>`:''}`;
+        ${tech?`<div class="tech">⚡ ${esc(tech)}</div>`:''}`;
     
     rows.forEach((r,si)=>{
         const [type,qty,reps,rest]=r.group;
@@ -532,41 +632,41 @@ function exerciseHTML(ex,i,d){
         if(tech){
             const lower=tech.toLowerCase();
             const isLast=si===rows.length-1;
-            if((lower.includes('drop')||lower.includes('rest pause'))&&isLast)special=`<div class="tech-inline">${esc(tech)}</div>`;
+            if((lower.includes('drop')||lower.includes('rest pause'))&&isLast)special=`<div class="tech-inline" style="font-size:12px; color:#8a2be2; font-weight:bold; margin-top:4px;">${esc(tech)}</div>`;
         }
         
         const prev = getLastExerciseData(current, i, si);
-        const prevLabel = prev ? `Anterior: ${prev.kg}kg × ${prev.reps}` : 'Primeira vez';
+        const prevLabel = prev ? `Anterior: ${prev.kg}kg × ${prev.reps}` : '1ª vez';
         
         const currentKg = parseFloat(x.kg ?? (prev ? prev.kg : 0)) || 0;
         const currentReps = parseInt(x.reps ?? (prev ? prev.reps : 0)) || 0;
         
         const isPR = currentKg > 0 && (currentKg > pr.kg || (currentKg === pr.kg && currentReps > pr.reps && pr.kg > 0));
 
-        const badgeHtml = isPR ? `<span class="pr-badge-live">⚡ NOVO PR!</span>` : `<span style="font-size:12px; color:#a855f7; font-weight:bold;">${prevLabel}</span>`;
+        const badgeHtml = isPR ? `<span class="pr-badge-live">⚡ NOVO PR!</span>` : `<span style="font-size:11px; color:#a855f7; font-weight:bold;">${prevLabel}</span>`;
 
-        html+=`<div class="set" style="padding:12px 0; border-bottom:1px solid rgba(255,255,255,0.06);"><div class="sethead"><div class="settype" style="font-size:15px; font-weight:bold; color:#a855f7;">${esc(type)} · Série ${r.number}/${r.total}</div>${badgeHtml}</div>
-        <div class="fields" style="margin-top:8px;">
-            <label style="font-size:12px; font-weight:bold; color:#aaa;">REPS FEITAS
+        html+=`<div class="set" style="padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.06);"><div class="sethead"><div class="settype" style="font-size:14px; font-weight:bold; color:#a855f7;">${esc(type)} · Série ${r.number}/${r.total}</div>${badgeHtml}</div>
+        <div class="fields" style="margin-top:6px;">
+            <label style="font-size:11px; font-weight:bold; color:#aaa;">REPS FEITAS
                 <div style="display:flex; gap:4px; align-items:center; margin-top:4px;">
-                    <button class="mini" type="button" style="padding:8px 12px; font-size:16px;" onclick="adjustVal(${i},${si},'reps',-1)">-</button>
-                    <input type="number" id="inp-reps-${i}-${si}" min="0" inputmode="numeric" style="font-size:16px; font-weight:bold; text-align:center;" placeholder="${prev?prev.reps:''}" value="${esc(x.reps??'')}" onchange="setVal(${i},${si},'reps',this.value)">
-                    <button class="mini" type="button" style="padding:8px 12px; font-size:16px;" onclick="adjustVal(${i},${si},'reps',1)">+</button>
+                    <button class="mini" type="button" style="padding:6px 10px; font-size:14px;" onclick="adjustVal(${i},${si},'reps',-1)">-</button>
+                    <input type="number" id="inp-reps-${i}-${si}" min="0" inputmode="numeric" style="font-size:15px; font-weight:bold; text-align:center;" placeholder="${prev?prev.reps:''}" value="${esc(x.reps??'')}" onchange="setVal(${i},${si},'reps',this.value)">
+                    <button class="mini" type="button" style="padding:6px 10px; font-size:14px;" onclick="adjustVal(${i},${si},'reps',1)">+</button>
                 </div>
             </label>
-            <label style="font-size:12px; font-weight:bold; color:#aaa;">CARGA (KG)
+            <label style="font-size:11px; font-weight:bold; color:#aaa;">CARGA (KG)
                 <div style="display:flex; gap:4px; align-items:center; margin-top:4px;">
-                    <button class="mini" type="button" style="padding:8px 12px; font-size:16px;" onclick="adjustVal(${i},${si},'kg',-2.5)">-</button>
-                    <input type="number" id="inp-kg-${i}-${si}" min="0" step="0.5" inputmode="decimal" style="font-size:16px; font-weight:bold; text-align:center;" placeholder="${prev?prev.kg:''}" value="${esc(x.kg??'')}" onchange="setVal(${i},${si},'kg',this.value)">
-                    <button class="mini" type="button" style="padding:8px 12px; font-size:16px;" onclick="adjustVal(${i},${si},'kg',2.5)">+</button>
+                    <button class="mini" type="button" style="padding:6px 10px; font-size:14px;" onclick="adjustVal(${i},${si},'kg',-2.5)">-</button>
+                    <input type="number" id="inp-kg-${i}-${si}" min="0" step="0.5" inputmode="decimal" style="font-size:15px; font-weight:bold; text-align:center;" placeholder="${prev?prev.kg:''}" value="${esc(x.kg??'')}" onchange="setVal(${i},${si},'kg',this.value)">
+                    <button class="mini" type="button" style="padding:6px 10px; font-size:14px;" onclick="adjustVal(${i},${si},'kg',2.5)">+</button>
                 </div>
             </label>
         </div>
-        <div class="obs" style="margin-top:6px;"><label style="font-size:11px; color:#aaa;">OBSERVAÇÃO<textarea onchange="setVal(${i},${si},'obs',this.value)">${esc(x.obs||'')}</textarea></label></div>${special}
-        <button class="check" style="font-size:15px; padding:12px; font-weight:bold; margin-top:10px;" onclick="toggleSet(${i},${si})">□ Marcar série concluída</button></div>`;
+        <div class="obs" style="margin-top:6px;"><label style="font-size:10px; color:#aaa;">OBSERVAÇÃO<textarea onchange="setVal(${i},${si},'obs',this.value)">${esc(x.obs||'')}</textarea></label></div>${special}
+        <button class="check" style="font-size:14px; padding:10px; font-weight:bold; margin-top:8px;" onclick="toggleSet(${i},${si})">□ Marcar série concluída</button></div>`;
     });
     
-    if(rows.some((r,si)=>!d.sets[makeKey(i,si)]?.done))html+=`<button class="exercise-finish" style="font-size:14px; font-weight:bold; padding:12px; margin-top:10px;" onclick="toggleEx(${i})">✓ Marcar exercício como concluído</button>`;
+    if(rows.some((r,si)=>!d.sets[makeKey(i,si)]?.done))html+=`<button class="exercise-finish" style="font-size:13px; font-weight:bold; padding:10px; margin-top:8px;" onclick="toggleEx(${i})">✓ Marcar exercício como concluído</button>`;
     return html+`</div>`;
 }
 
@@ -608,7 +708,7 @@ function toggleSet(i,j){
     
     save();
     renderWorkout();
-    toast(d.sets[k].done ? (allDone ? 'Exercício concluído' : 'Série salva') : 'Série desmarcada');
+    toast(d.sets[k].done ? (allDone ? 'Exercício concluído' : 'Série salva (+15 XP)') : 'Série desmarcada');
 }
 
 function toggleEx(i){
@@ -668,34 +768,39 @@ function finishWorkout(){
 function showVictoryModal(record){
     const stats = getUserStats();
     const cardioMin = parseFloat(record.data?.cardio?.time) || 0;
-    const xpGained = 200 + Math.floor(cardioMin) + Math.floor(record.totalVolume / 50);
+    const xpGained = 200 + Math.floor(cardioMin * 3) + Math.floor(record.totalVolume / 50);
 
-    app.innerHTML = `<div class="app" style="text-align:center; padding-top:40px;">
+    app.innerHTML = `<div class="app" style="text-align:center; padding-top:30px;">
         <div style="font-size: 50px;">⚡</div>
-        <h1 style="color:#a855f7; font-size:26px; text-transform:uppercase; margin-top:10px;">MISSÃO CONCLUÍDA!</h1>
-        <div class="muted">Você completou o ${esc(record.name)}</div>
+        <h1 style="color:#a855f7; font-size:24px; text-transform:uppercase; margin-top:8px;">MISSÃO CONCLUÍDA!</h1>
+        <div class="muted">Completou o ${esc(record.name)}</div>
 
-        <div class="card" style="border: 1px solid #8a2be2; background: rgba(138, 43, 226, 0.08); margin-top:20px; text-align:left; box-shadow: 0 0 20px rgba(138,43,226,0.3);">
-            <div style="font-size:14px; font-weight:bold; color:#a855f7;">+${xpGained} EXP ADICIONADOS</div>
-            <div style="font-size:12px; color:#8a2be2; margin-top:4px; font-weight:bold;">TÍTULO: ${esc(stats.rank)}</div>
+        <div class="card" style="border: 1px solid #8a2be2; background: rgba(138, 43, 226, 0.08); margin-top:15px; text-align:left; box-shadow: 0 0 20px rgba(138,43,226,0.3);">
+            <div style="font-size:14px; font-weight:bold; color:#a855f7;">+${xpGained} XP ADICIONADOS</div>
+            <div style="font-size:12px; color:#8a2be2; margin-top:2px; font-weight:bold;">TÍTULO: ${esc(stats.rank)}</div>
             <div style="font-size:18px; font-weight:bold; margin-top:4px;">Nível ${stats.level} <span style="font-size:12px; color:#aaa;">(${stats.progressPct}%)</span></div>
-            <div style="width: 100%; background: rgba(255,255,255,0.1); height: 10px; border-radius: 5px; overflow: hidden; margin-top: 8px;">
+            <div style="width: 100%; background: rgba(255,255,255,0.1); height: 8px; border-radius: 4px; overflow: hidden; margin-top: 8px;">
                 <div style="width: ${stats.progressPct}%; background: linear-gradient(90deg, #6366f1, #8a2be2, #a855f7); height: 100%;"></div>
             </div>
             
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:15px; font-size:13px; border-top:1px solid rgba(255,255,255,0.08); padding-top:10px;">
-                <div>Volume Total:<br><strong style="color:#a855f7;">${record.totalVolume.toLocaleString('pt-BR')} kg</strong></div>
+                <div>Volume Total:<br><strong style="color:#a855f7;">${formatVolume(record.totalVolume)}</strong></div>
                 <div>Tempo:<br><strong style="color:#fff;">${formatDuration(record.duration)}</strong></div>
-            </div>
-            <div style="margin-top:10px; font-size:12px; color:#aaa;">
-                Descanso Realizado: <strong style="color:#a855f7;">${formatDuration(record.restDuration||0)}</strong> / <strong style="color:#00f3ff;">${formatDuration(record.scheduledRestTotal||0)}</strong> Programado
             </div>
         </div>
         <button class="primary" style="margin-top:25px; width:100%; padding:16px; font-weight:bold; background: linear-gradient(135deg, #8a2be2, #a855f7);" onclick="home()">VOLTAR AO PAINEL PRINCIPAL</button>
     </div>`;
 }
 
-function cancelWorkout(){if(confirm('Sair agora? O rascunho ficará salvo para continuar depois.')){stopTotalTimer();if(timerId)clearInterval(timerId);stopAllRestTimers();releaseWakeLock();home()}}
+function cancelWorkout(){
+    showConfirmModal('Sair do Treino', 'Deseja sair? O rascunho atual ficará salvo para você continuar depois.', () => {
+        stopTotalTimer();
+        if(timerId)clearInterval(timerId);
+        stopAllRestTimers();
+        releaseWakeLock();
+        home();
+    });
+}
 
 function startTotalTimer(){stopTotalTimer();totalTimerId=setInterval(()=>{const d=draft();const x=document.getElementById('totalTime');if(x&&d.startedAt)x.textContent=formatDuration(Math.floor((Date.now()-d.startedAt)/1000));const y=document.getElementById('restTotalLabel');if(y)y.innerHTML=`Descanso realizado: <span style="color:#a855f7;">${formatDuration(restTotalForDraft())}</span> / <span style="color:#00f3ff;">${formatDuration(d.scheduledRestTotal||0)}</span> programado`},1000)}
 function stopTotalTimer(){if(totalTimerId)clearInterval(totalTimerId);totalTimerId=null}
@@ -756,69 +861,151 @@ function stopGlobalRest(commit=true){
 }
 function stopAllRestTimers(){stopGlobalRest(true)}
 
-function setEvolutionMetric(m){currentEvolutionMetric = m; evolutionScreen(currentEvolutionFilter);}
+function evolutionScreen(workoutKey = null) {
+    stopTotalTimer();
+    screen = 'evolution';
 
-function updateSearchFilter(val) {
-    searchFilterQuery = val.toLowerCase();
-    if (screen === 'evolution') evolutionScreen(currentEvolutionFilter);
-    else if (screen === 'records') recordsScreen(currentRecordsFilter);
+    if (!workoutKey) {
+        let html = `<div class="app">${header('Evolução por Exercício')}
+        <p class="muted">Selecione o treino para explorar o histórico e progresso individual dos exercícios:</p>
+        <div class="grid" style="margin-top:15px;">
+            ${Object.keys(DATA).map(k => `
+                <button class="day" onclick="evolutionScreen('${k}')">
+                    <strong>${DATA[k].name}</strong>
+                    <span>${DATA[k].desc}</span>
+                </button>
+            `).join('')}
+        </div></div>`;
+        app.innerHTML = html;
+        return;
+    }
+
+    const workout = DATA[workoutKey];
+
+    if (!selectedExEvo || !workout.ex.some(e => e[0] === selectedExEvo)) {
+        selectedExEvo = workout.ex[0][0];
+    }
+
+    let html = `<div class="app">${header(`Evolução: ${workout.name}`)}
+    <div style="display:flex; overflow-x:auto; gap:6px; margin-bottom:12px; padding-bottom:4px;">
+        ${workout.ex.map(ex => `
+            <button class="${selectedExEvo===ex[0]?'primary':'secondary'}" style="white-space:nowrap; padding:6px 12px; font-size:12px;" onclick="renderExerciseEvoDetails('${workoutKey}', '${esc(ex[0])}')">
+                ${esc(ex[0])}
+            </button>
+        `).join('')}
+    </div>
+    <div id="exerciseEvoContainer"></div>
+    </div>`;
+
+    app.innerHTML = html;
+    renderExerciseEvoDetails(workoutKey, selectedExEvo);
 }
 
-function renderEvolutionChart(historyExMap) {
+function renderExerciseEvoDetails(workoutKey, exName) {
+    selectedExEvo = exName;
+    const container = document.getElementById('exerciseEvoContainer');
+    if (!container) return;
+
+    const historyPoints = [];
+    let bestKg = 0, bestReps = 0;
+
+    db.history.slice().sort((a,b)=>new Date(a.date)-new Date(b.date)).forEach(record => {
+        if (record.workout !== workoutKey) return;
+        const wData = DATA[record.workout];
+        if (!wData) return;
+
+        wData.ex.forEach((exInfo, exIndex) => {
+            if (exInfo[0] === exName) {
+                let maxKg = 0, maxReps = 0;
+                expandedGroups(exInfo[1]).forEach((_, setIndex) => {
+                    const setData = record.data?.sets?.[`${record.workout}-${exIndex}-${setIndex}`] || {};
+                    const kg = parseFloat(setData.kg) || 0;
+                    const reps = parseInt(setData.reps) || 0;
+                    if (kg > maxKg || (kg === maxKg && reps > maxReps)) {
+                        maxKg = kg; maxReps = reps;
+                    }
+                    if (kg > bestKg || (kg === bestKg && reps > bestReps)) {
+                        bestKg = kg; bestReps = reps;
+                    }
+                });
+                if (maxKg > 0) {
+                    const dateStr = new Date(record.date).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'});
+                    historyPoints.push({ dateStr, fullDate: new Date(record.date), kg: maxKg, reps: maxReps });
+                }
+            }
+        });
+    });
+
+    if (historyPoints.length === 0) {
+        container.innerHTML = `<div class="card" style="text-align:center; padding:20px; margin-top:15px;">
+            <div style="font-size:30px; margin-bottom:8px;">📊</div>
+            <strong>${esc(exName)}</strong>
+            <p class="muted" style="margin-top:6px; font-size:13px;">Sem dados suficientes registados neste exercício.</p>
+        </div>`;
+        return;
+    }
+
+    const latest = historyPoints[historyPoints.length - 1];
+    const oldest = historyPoints[0];
+    const kgDiff = latest.kg - oldest.kg;
+
+    let diffText = 'Primeiro registro';
+    if (historyPoints.length > 1) {
+        diffText = kgDiff >= 0 ? `+${kgDiff} kg desde o 1º registro` : `${kgDiff} kg desde o 1º registro`;
+    }
+
+    container.innerHTML = `
+    <div class="card" style="border:1px solid #a855f7; margin-bottom:15px; background:rgba(168,85,247,0.06);">
+        <h3 style="color:#fff; margin:0 0 10px 0; font-size:16px;">${esc(exName)}</h3>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; font-size:13px;">
+            <div>Carga Máxima:<br><strong style="font-size:18px; color:#a855f7;">${bestKg} kg</strong></div>
+            <div>Melhor Rep:<br><strong style="font-size:18px; color:#fff;">${bestReps} reps</strong></div>
+            <div>Último Treino:<br><strong style="color:#00f3ff;">${latest.kg} kg × ${latest.reps}</strong></div>
+            <div>Evolução:<br><strong style="color:${kgDiff>=0?'#a855f7':'#ef4444'};">${diffText}</strong></div>
+        </div>
+    </div>
+
+    <div class="card" style="padding:10px; margin-bottom:15px;">
+        <div style="font-size:12px; font-weight:bold; color:#aaa; margin-bottom:8px;">GRÁFICO DE PROGRESSÃO DE CARGA</div>
+        <canvas id="evoExCanvas" style="width:100%; height:180px;"></canvas>
+    </div>
+
+    <div class="card">
+        <div style="font-size:12px; font-weight:bold; color:#aaa; margin-bottom:8px;">HISTÓRICO RECENTE</div>
+        <div style="display:flex; flex-direction:column; gap:6px;">
+            ${historyPoints.slice().reverse().map(p => `
+                <div style="display:flex; justify-content:space-between; font-size:13px; border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:4px;">
+                    <span style="color:#888;">${p.dateStr}</span>
+                    <strong style="color:#a855f7;">${p.kg} kg × ${p.reps} reps</strong>
+                </div>
+            `).join('')}
+        </div>
+    </div>`;
+
     loadChartJS(() => {
-        const ctx = document.getElementById('evoChartCanvas')?.getContext('2d');
+        const ctx = document.getElementById('evoExCanvas')?.getContext('2d');
         if (!ctx) return;
-
         if (activeChartInstance) activeChartInstance.destroy();
-
-        const dates = [];
-
-        Object.keys(historyExMap).forEach((exName) => {
-            historyExMap[exName].forEach(item => {
-                if (!dates.includes(item.dateStr)) dates.push(item.dateStr);
-            });
-        });
-
-        dates.sort();
-
-        const colors = ['#a855f7', '#8a2be2', '#6366f1', '#ec4899', '#00f3ff'];
-        let colorIdx = 0;
-
-        const datasets = Object.keys(historyExMap).map(exName => {
-            const dataMap = {};
-            historyExMap[exName].forEach(item => {
-                if (currentEvolutionMetric === 'kg') dataMap[item.dateStr] = item.kg;
-                else if (currentEvolutionMetric === 'reps') dataMap[item.dateStr] = item.totalReps;
-                else dataMap[item.dateStr] = item.volume;
-            });
-
-            const dataPoints = dates.map(d => dataMap[d] || null);
-            const color = colors[colorIdx % colors.length];
-            colorIdx++;
-
-            return {
-                label: exName,
-                data: dataPoints,
-                borderColor: color,
-                backgroundColor: color + '22',
-                borderWidth: 2,
-                pointRadius: 4,
-                pointHoverRadius: 6,
-                spanGaps: true,
-                tension: 0.3
-            };
-        });
 
         activeChartInstance = new Chart(ctx, {
             type: 'line',
-            data: { labels: dates, datasets },
+            data: {
+                labels: historyPoints.map(p => p.dateStr),
+                datasets: [{
+                    label: 'Carga (kg)',
+                    data: historyPoints.map(p => p.kg),
+                    borderColor: '#a855f7',
+                    backgroundColor: 'rgba(168,85,247,0.2)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 4
+                }]
+            },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: {
-                    legend: { labels: { color: '#e0e0e0', font: { size: 10 } } },
-                    tooltip: { backgroundColor: '#0b0a12', titleColor: '#a855f7', bodyColor: '#fff', borderColor: '#8a2be2', borderWidth: 1 }
-                },
+                plugins: { legend: { display: false } },
                 scales: {
                     x: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } },
                     y: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } }
@@ -828,127 +1015,11 @@ function renderEvolutionChart(historyExMap) {
     });
 }
 
-function evolutionScreen(filterWorkout = 'ALL'){
-    stopTotalTimer();
-    screen='evolution';
-    currentEvolutionFilter = filterWorkout;
-    const historyExMap = {};
-    
-    db.history.slice().sort((a,b)=>new Date(a.date)-new Date(b.date)).forEach(record => {
-        if(filterWorkout !== 'ALL' && record.workout !== filterWorkout) return;
-
-        const workoutData = DATA[record.workout];
-        if(!workoutData) return;
-        const dateStr = new Date(record.date).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'});
-        const fullDate = new Date(record.date);
-
-        workoutData.ex.forEach((exInfo, exIndex) => {
-            const exName = exInfo[0];
-            const key = filterWorkout === 'ALL' ? `${exName} (${record.workout})` : exName;
-
-            if (searchFilterQuery && !key.toLowerCase().includes(searchFilterQuery)) return;
-
-            historyExMap[key] = historyExMap[key] || [];
-            let maxKg = 0, maxReps = 0, totalExVol = 0, totalExReps = 0;
-            
-            expandedGroups(exInfo[1]).forEach((row, setIndex) => {
-                const setData = record.data.sets[`${record.workout}-${exIndex}-${setIndex}`] || {};
-                const kg = parseFloat(setData.kg) || 0;
-                const reps = parseInt(setData.reps) || 0;
-                if(kg > maxKg || (kg === maxKg && reps > maxReps)) { maxKg = kg; maxReps = reps; }
-                totalExVol += (kg * reps);
-                totalExReps += reps;
-            });
-
-            if(maxKg > 0) historyExMap[key].push({ dateStr, fullDate, kg: maxKg, topReps: maxReps, totalReps: totalExReps, volume: totalExVol });
-        });
-    });
-
-    let html = `<div class="app">${header('Evolução de Cargas & Volume')}
-    <div style="margin-bottom: 10px;">
-        <input type="text" placeholder="🔍 Pesquisar exercício..." value="${esc(searchFilterQuery)}" oninput="updateSearchFilter(this.value)" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(138,43,226,0.4); background: rgba(0,0,0,0.4); color: #fff; font-size: 14px;">
-    </div>
-    <div style="display:flex; overflow-x:auto; gap:6px; margin-bottom:12px; padding-bottom:5px;">
-        <button class="${filterWorkout==='ALL'?'primary':'secondary'}" style="white-space:nowrap; padding:6px 12px; font-size:13px;" onclick="evolutionScreen('ALL')">Todos</button>
-        ${Object.keys(DATA).map(k => `<button class="${filterWorkout===k?'primary':'secondary'}" style="white-space:nowrap; padding:6px 12px; font-size:13px;" onclick="evolutionScreen('${k}')">Treino ${k}</button>`).join('')}
-    </div>
-    
-    <div style="display:flex; gap:6px; margin-bottom:15px;">
-        <button class="${currentEvolutionMetric==='kg'?'primary':'secondary'}" style="flex:1; padding:8px; font-size:12px;" onclick="setEvolutionMetric('kg')">Carga Max (kg)</button>
-        <button class="${currentEvolutionMetric==='reps'?'primary':'secondary'}" style="flex:1; padding:8px; font-size:12px;" onclick="setEvolutionMetric('reps')">Total Reps</button>
-        <button class="${currentEvolutionMetric==='volume'?'primary':'secondary'}" style="flex:1; padding:8px; font-size:12px;" onclick="setEvolutionMetric('volume')">Volume (kg)</button>
-    </div>
-
-    <div class="card" style="padding:10px; margin-bottom:15px; border: 1px solid rgba(138,43,226,0.3);">
-        <canvas id="evoChartCanvas" style="width:100%; height:200px;"></canvas>
-    </div>`;
-
-    const exNames = Object.keys(historyExMap);
-    if(exNames.length === 0){
-        html += `<div class="empty">Nenhum histórico encontrado.</div>`;
-    } else {
-        exNames.forEach(keyName => {
-            const records = historyExMap[keyName];
-            if(records.length === 0) return;
-            const recent = records.slice().reverse().slice(0, 5);
-            const latest = recent[0];
-            const oldest = recent[recent.length - 1];
-            
-            let maxVal = 1;
-            if(currentEvolutionMetric==='kg') maxVal = Math.max(...recent.map(r => r.kg)) || 1;
-            if(currentEvolutionMetric==='reps') maxVal = Math.max(...recent.map(r => r.totalReps)) || 1;
-            if(currentEvolutionMetric==='volume') maxVal = Math.max(...recent.map(r => r.volume)) || 1;
-
-            const kgDiff = latest.kg - oldest.kg;
-            const daysDiff = Math.round((latest.fullDate - oldest.fullDate) / (1000 * 60 * 60 * 24));
-            
-            let badgeDiff = '';
-            if(recent.length > 1 && daysDiff > 0 && currentEvolutionMetric==='kg'){
-                const sign = kgDiff >= 0 ? '+' : '';
-                const color = kgDiff >= 0 ? '#a855f7' : '#ef4444';
-                if(kgDiff !== 0) {
-                    badgeDiff = `<div style="color:${color}; font-weight:bold; margin-top:8px; font-size:12px;">${kgDiff >= 0 ? '↑' : '↓'} ${sign}${kgDiff}kg de carga max em ${daysDiff} dias</div>`;
-                } else {
-                    badgeDiff = `<div style="color:#aaa; margin-top:8px; font-size:12px;">Carga mantida nos últimos ${daysDiff} dias</div>`;
-                }
-            }
-
-            html += `<div class="card">
-                <div class="exercise-name" style="margin-bottom:12px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom:6px;">${esc(keyName)}</div>
-                <div style="display:flex; flex-direction:column; gap:8px;">
-                    ${recent.map(r => {
-                        let val = r.kg, label = `${r.kg}kg (Top: ${r.topReps} reps)`;
-                        if(currentEvolutionMetric === 'reps') { val = r.totalReps; label = `${r.totalReps} reps totais`; } 
-                        else if(currentEvolutionMetric === 'volume') { val = r.volume; label = `${r.volume.toLocaleString('pt-BR')}kg vol`; }
-                        const pct = Math.max(12, Math.round((val / maxVal) * 100));
-                        
-                        return `<div>
-                            <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:2px;">
-                                <span style="font-weight:bold; color:#a855f7;">${r.dateStr}</span>
-                                <span><strong>${label}</strong></span>
-                            </div>
-                            <div style="width:100%; background:rgba(255,255,255,0.08); height:8px; border-radius:4px; overflow:hidden;">
-                                <div style="width:${pct}%; background:linear-gradient(90deg, #6366f1, #8a2be2, #a855f7); height:100%;"></div>
-                            </div>
-                        </div>`;
-                    }).join('')}
-                </div>
-                ${badgeDiff}
-            </div>`;
-        });
-    }
-    html += `</div>`;
-    app.innerHTML = html;
-    
-    if(exNames.length > 0) renderEvolutionChart(historyExMap);
-}
-
 function recordsScreen(filterWorkout = 'ALL'){
     stopTotalTimer();
     screen='records';
     currentRecordsFilter = filterWorkout;
     const prMap = {};
-    let lastPRBroken = null;
 
     db.history.slice().sort((a,b) => new Date(a.date) - new Date(b.date)).forEach(record => {
         if(filterWorkout !== 'ALL' && record.workout !== filterWorkout) return;
@@ -961,8 +1032,6 @@ function recordsScreen(filterWorkout = 'ALL'){
             const exName = exInfo[0];
             const key = filterWorkout === 'ALL' ? `${exName} (${record.workout})` : exName;
 
-            if (searchFilterQuery && !key.toLowerCase().includes(searchFilterQuery)) return;
-
             expandedGroups(exInfo[1]).forEach((row, setIndex) => {
                 const setData = record.data.sets[`${record.workout}-${exIndex}-${setIndex}`] || {};
                 const kg = parseFloat(setData.kg) || 0;
@@ -972,9 +1041,7 @@ function recordsScreen(filterWorkout = 'ALL'){
                     const currentBestKg = prMap[key]?.kg || 0;
                     const currentBestReps = prMap[key]?.reps || 0;
                     if(kg > currentBestKg || (kg === currentBestKg && reps > currentBestReps)){
-                        const item = { keyName: key, kg, reps, dateStr };
-                        prMap[key] = item;
-                        lastPRBroken = item;
+                        prMap[key] = { keyName: key, kg, reps, dateStr };
                     }
                 }
             });
@@ -982,37 +1049,25 @@ function recordsScreen(filterWorkout = 'ALL'){
     });
 
     let html = `<div class="app">${header('Recordes Pessoais (PRs)')}
-    <div style="margin-bottom: 10px;">
-        <input type="text" placeholder="🔍 Pesquisar exercício..." value="${esc(searchFilterQuery)}" oninput="updateSearchFilter(this.value)" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(138,43,226,0.4); background: rgba(0,0,0,0.4); color: #fff; font-size: 14px;">
-    </div>
     <div style="display:flex; overflow-x:auto; gap:6px; margin-bottom:15px; padding-bottom:5px;">
-        <button class="${filterWorkout==='ALL'?'primary':'secondary'}" style="white-space:nowrap; padding:6px 12px; font-size:13px;" onclick="recordsScreen('ALL')">Todos</button>
-        ${Object.keys(DATA).map(k => `<button class="${filterWorkout===k?'primary':'secondary'}" style="white-space:nowrap; padding:6px 12px; font-size:13px;" onclick="recordsScreen('${k}')">Treino ${k}</button>`).join('')}
+        <button class="${filterWorkout==='ALL'?'primary':'secondary'}" style="white-space:nowrap; padding:6px 12px; font-size:12px;" onclick="recordsScreen('ALL')">Todos</button>
+        ${Object.keys(DATA).map(k => `<button class="${filterWorkout===k?'primary':'secondary'}" style="white-space:nowrap; padding:6px 12px; font-size:12px;" onclick="recordsScreen('${k}')">Treino ${k}</button>`).join('')}
     </div>`;
-
-    if(lastPRBroken && filterWorkout === 'ALL' && !searchFilterQuery){
-        html += `<div class="card" style="border: 1px solid #a855f7; background: rgba(168, 85, 247, 0.08); margin-bottom: 20px; box-shadow: 0 0 15px rgba(168,85,247,0.2);">
-            <div style="font-size:11px; color:#a855f7; text-transform:uppercase; font-weight:bold; letter-spacing:1px;">🏆 ÚLTIMO RECORDE BATIDO</div>
-            <div style="font-size:16px; font-weight:bold; margin-top:4px;">${esc(lastPRBroken.keyName)}</div>
-            <div style="font-size:22px; font-weight:bold; color:#a855f7; margin-top:2px;">${lastPRBroken.kg} kg <span style="font-size:14px; color:#fff; font-weight:normal;">× ${lastPRBroken.reps} reps</span></div>
-            <div class="muted" style="margin-top:2px;">Conquistado em ${lastPRBroken.dateStr}</div>
-        </div>`;
-    }
 
     const prList = Object.values(prMap).sort((a,b) => b.kg - a.kg);
     if(prList.length === 0){
         html += `<div class="empty">Nenhum recorde encontrado.</div>`;
     } else {
-        html += `<div style="display:flex; flex-direction:column; gap:10px;">`;
+        html += `<div style="display:flex; flex-direction:column; gap:8px;">`;
         prList.forEach(pr => {
-            html += `<div class="card" style="display:flex; justify-content:space-between; align-items:center;">
+            html += `<div class="card" style="display:flex; justify-content:space-between; align-items:center; padding:12px;">
                 <div style="flex:1; padding-right:10px;">
-                    <div style="font-weight:bold; font-size:14px; line-height:1.2; margin-bottom:4px;">🏆 ${esc(pr.keyName)}</div>
-                    <div class="muted" style="font-size:11px;">Alcançado em ${pr.dateStr}</div>
+                    <div style="font-weight:bold; font-size:14px; line-height:1.2; color:#fff;">🏆 ${esc(pr.keyName)}</div>
+                    <div class="muted" style="font-size:11px; margin-top:2px;">Alcançado em ${pr.dateStr}</div>
                 </div>
-                <div style="text-align:right; min-width:90px;">
+                <div style="text-align:right;">
                     <div style="font-size:18px; font-weight:bold; color:#a855f7;">${pr.kg} kg</div>
-                    <div style="font-size:12px; color:#aaa;">${pr.reps} reps</div>
+                    <div style="font-size:11px; color:#aaa;">${pr.reps} reps</div>
                 </div>
             </div>`;
         });
@@ -1026,7 +1081,7 @@ function getWeeklyComparison(){
     const now = new Date();
     const startThisWeek = new Date(now.setDate(now.getDate() - now.getDay())).setHours(0,0,0,0);
     const startLastWeek = new Date(startThisWeek - 7*24*60*60*1000).getTime();
-    let thisWeekVol = 0, lastWeekVol = 0, thisWeekTime = 0, lastWeekTime = 0, thisWeekCardio = 0, lastWeekCardio = 0, thisWeekCount = 0, lastWeekCount = 0;
+    let thisWeekVol = 0, lastWeekVol = 0, thisWeekTime = 0, thisWeekCardio = 0, thisWeekCount = 0;
 
     db.history.forEach(r => {
         const t = new Date(r.date).getTime();
@@ -1034,78 +1089,96 @@ function getWeeklyComparison(){
         if(t >= startThisWeek){
             thisWeekVol += vol; thisWeekTime += dur; thisWeekCardio += cardio; thisWeekCount++;
         } else if(t >= startLastWeek && t < startThisWeek){
-            lastWeekVol += vol; lastWeekTime += dur; lastWeekCardio += cardio; lastWeekCount++;
+            lastWeekVol += vol;
         }
     });
     const volDiffPct = lastWeekVol > 0 ? (((thisWeekVol - lastWeekVol) / lastWeekVol) * 100).toFixed(1) : 0;
-    return { thisWeekTon: (thisWeekVol / 1000).toFixed(1), lastWeekTon: (lastWeekVol / 1000).toFixed(1), volDiffPct, thisWeekTime: formatDuration(thisWeekTime), thisWeekCardio, thisWeekCount };
+    return { thisWeekVolRaw: thisWeekVol, volDiffPct, thisWeekTime: formatDuration(thisWeekTime), thisWeekCardio, thisWeekCount };
 }
 
 function historyScreen(){
     stopTotalTimer();
     screen='history';
-    const weekly = getWeeklyComparison();
 
-    let html = `<div class="app">${header('Histórico & Estatísticas')}
-    <div class="card" style="background: rgba(138, 43, 226, 0.08); border: 1px solid rgba(138, 43, 226, 0.3); margin-bottom:20px;">
-        <div style="font-weight:bold; font-size:14px; margin-bottom:8px; color:#a855f7;">🎯 EVOLUÇÃO SEMANAL (VOLUME)</div>
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; font-size:13px;">
-            <div><span class="muted">Semana passada:</span><br><strong style="color:#fff;">${weekly.lastWeekTon} toneladas</strong></div>
-            <div><span class="muted">Esta semana:</span><br><strong style="color:#a855f7;">${weekly.thisWeekTon} toneladas</strong></div>
-        </div>
-        <div style="margin-top:8px; font-size:12px; font-weight:bold; color:${weekly.volDiffPct>=0?'#a855f7':'#ef4444'};">
-            ${weekly.volDiffPct>=0?'↑ +':'↓ '}${weekly.volDiffPct}% de volume esta semana
-        </div>
-        <div style="margin-top:10px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.08); font-size:12px; display:flex; justify-content:space-between;">
-            <span>Treinos: <strong>${weekly.thisWeekCount}</strong></span>
-            <span>Tempo: <strong>${weekly.thisWeekTime}</strong></span>
-            <span>Cardio: <strong>${weekly.thisWeekCardio} min</strong></span>
-        </div>
-    </div>`;
+    let html = `<div class="app">${header('Diário de Treinos')}
+    <p class="muted">Histórico resumido das suas missões completadas:</p>`;
 
     if(db.history.length === 0){
         html += `<div class="empty">Ainda não há treinos finalizados.</div>`;
     } else {
+        html += `<div style="display:flex; flex-direction:column; gap:10px; margin-top:12px;">`;
         html += db.history.slice().reverse().map(r => {
             const d = new Date(r.date);
-            const volStr = r.totalVolume ? ` · Volume: ${(r.totalVolume/1000).toFixed(1)}t` : '';
-            const rawStr = r.totalWeightRaw ? ` (${r.totalWeightRaw}kg bruto)` : '';
-            return `<div class="history-item">
-                <div class="row"><strong>${r.name}</strong><span class="pill">${d.toLocaleDateString('pt-BR')} ${d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</span></div>
-                <div class="muted">Duração: ${formatDuration(r.duration)}${volStr}${rawStr}</div>
-                <button class="secondary" onclick="viewRecord('${r.id}')">Ver treino completo</button>
+            const dateStr = `${d.toLocaleDateString('pt-BR')} · ${d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`;
+            return `<div class="card" style="padding:12px; border:1px solid rgba(168,85,247,0.2);">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <strong style="font-size:16px; color:#a855f7;">${esc(r.name)}</strong>
+                    <span style="font-size:11px; color:#aaa;">${dateStr}</span>
+                </div>
+                <div style="font-size:13px; color:#ccc; margin-top:6px;">
+                    ⏱️ ${formatDuration(r.duration)} · 🏋️ ${formatVolume(r.totalVolume || 0)}
+                </div>
+                <div style="display:flex; gap:8px; margin-top:10px;">
+                    <button class="secondary" style="flex:1; padding:8px; font-size:12px;" onclick="viewRecord('${r.id}')">📄 Ver treino</button>
+                    <button class="secondary danger" style="padding:8px 12px; font-size:12px;" onclick="deleteRecord('${r.id}')">🗑 Excluir</button>
+                </div>
             </div>`;
         }).join('');
+        html += `</div>`;
     }
     html += `</div>`;
     app.innerHTML = html;
 }
 
 function deleteRecord(id){
-    if(confirm('Tem certeza que deseja excluir este treino específico do histórico?')){
+    showConfirmModal('Excluir Treino', 'Tem certeza que deseja apagar este treino do seu histórico?', () => {
         db.history = db.history.filter(x => x.id !== id);
         save();
         toast('Treino excluído do histórico');
         historyScreen();
-    }
+    });
 }
 
 function viewRecord(id){
     const r=db.history.find(x=>x.id===id),v=DATA[r.workout];
-    let html=`<div class="app">${header('Registro do treino')}<div class="muted">${new Date(r.date).toLocaleString('pt-BR')} · Duração ${formatDuration(r.duration)}<br>Volume: ${(r.totalVolume||0).toLocaleString('pt-BR')} kg · Carga Bruta: ${(r.totalWeightRaw||0).toLocaleString('pt-BR')} kg<br>Descanso: ${formatDuration(r.restDuration||0)} de ${formatDuration(r.scheduledRestTotal||0)} programado</div>`;
     
+    let detailsHtml = `
+        <div style="margin-bottom:12px; font-size:13px; color:#aaa;">
+            ${new Date(r.date).toLocaleString('pt-BR')}<br>
+            Duração: <strong>${formatDuration(r.duration)}</strong> | Vol: <strong>${formatVolume(r.totalVolume||0)}</strong>
+        </div>
+    `;
+
     v.ex.forEach((ex,i)=>{
-        html+=`<div class="card"><div class="exercise-name">${i+1}. ${esc(ex[0])}</div>`;
+        detailsHtml+=`<div style="margin-bottom:10px; background:rgba(255,255,255,0.03); padding:8px; border-radius:8px;">
+            <div style="font-weight:bold; font-size:13px; color:#a855f7;">${i+1}. ${esc(ex[0])}</div>`;
         expandedGroups(ex[1]).forEach((row,j)=>{
-            const s=row.group,x=r.data.sets[`${r.workout}-${i}-${j}`]||{};
-            html+=`<div class="set"><div class="settype">${esc(s[0])} · Série ${row.number}/${row.total}</div><div class="muted">Planejado: ${esc(s[2])} reps · ${esc(s[3])}</div><div style="margin-top:7px"><b style="color:#a855f7;">${x.kg||'—'} kg</b> · ${x.reps||'—'} reps ${x.done?'· ✓ concluída':''}</div>${x.obs?`<div class="muted">${esc(x.obs)}</div>`:''}</div>`;
+            const x=r.data.sets[`${r.workout}-${i}-${j}`]||{};
+            detailsHtml+=`<div style="font-size:12px; margin-top:4px; display:flex; justify-content:space-between;">
+                <span>Série ${row.number}/${row.total}</span>
+                <strong>${x.kg||'—'} kg × ${x.reps||'—'} reps ${x.done?'✓':''}</strong>
+            </div>`;
         });
-        html+=`</div>`;
+        detailsHtml+=`</div>`;
     });
-    
+
     const c=r.data.cardio||{};
-    html+=`<div class="section-title">Cardio do dia</div><div class="card">${c.time||'—'} min · ${c.dist||'—'} km · ${c.bpm||'—'} BPM médio${c.obs?`<div class="muted">${esc(c.obs)}</div>`:''}</div><button class="secondary danger" style="margin-top:20px" onclick="deleteRecord('${r.id}')">Excluir este treino</button></div>`;
-    app.innerHTML=html;
+    if (c.time) {
+        detailsHtml += `<div style="font-size:12px; background:rgba(0,243,255,0.05); padding:8px; border-radius:8px; margin-top:10px;">
+            <strong>Cardio:</strong> ${c.time} min | ${c.dist||'0'} km | ${c.bpm||'—'} BPM
+        </div>`;
+    }
+
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+        <div class="modal-box">
+            <h3 style="color:#a855f7; margin-top:0;">${esc(r.name)}</h3>
+            ${detailsHtml}
+            <button class="primary" style="width:100%; padding:10px; margin-top:15px; background:linear-gradient(135deg, #8a2be2, #a855f7);" onclick="this.parentElement.parentElement.remove()">Fechar</button>
+        </div>
+    `;
+    document.body.appendChild(modal);
 }
 
 function editWorkoutExercises(workoutKey) {
@@ -1173,8 +1246,22 @@ function updateUserName(){
     if(input){ db.user.name = input; save(); toast('Nome atualizado!'); }
 }
 
-function clearDrafts(){if(confirm('Apagar todos os treinos que estão apenas como rascunho?')){db.drafts={};save();toast('Rascunhos apagados')}}
-function wipeHistory(){if(confirm('Apagar todo o histórico?')){db.history=[];save();historyScreen()}}
+function clearDrafts(){
+    showConfirmModal('Limpar Rascunhos', 'Deseja apagar todos os treinos em andamento salvos como rascunho?', () => {
+        db.drafts = {};
+        save();
+        toast('Rascunhos apagados');
+    });
+}
+
+function wipeHistory(){
+    showConfirmModal('Apagar Histórico', 'ATENÇÃO: Esta ação apaga todo o histórico e nível do Caçador. Deseja continuar?', () => {
+        db.history = [];
+        save();
+        historyScreen();
+    });
+}
+
 function exportData(){const b=new Blob([JSON.stringify(db,null,2)],{type:'application/json'}),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download='solo-leveling-historico.json';a.click();URL.revokeObjectURL(u)}
 
 function importData(event) {
@@ -1210,4 +1297,4 @@ function pdfScreen(){
 function goHome(){stopTotalTimer();if(timerId)clearInterval(timerId);stopAllRestTimers();home()}
 
 home();
-if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js?v=13');
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js?v=14');
