@@ -57,7 +57,6 @@ db = db || {
     restState:{deadline:0,total:0,startedAt:0}
 };
 
-// Garantir padrões caso campos faltem no storage antigo
 if (!db.user.targetWorkouts) db.user.targetWorkouts = 5;
 if (!db.user.targetCardio) db.user.targetCardio = 60;
 
@@ -98,26 +97,32 @@ const SoundFX = {
                 osc.stop(startTime + 0.15);
             });
         } catch(e) {}
+    },
+    playBeep() {
+        try {
+            this.init();
+            if (!this.ctx) return;
+            if (this.ctx.state === 'suspended') this.ctx.resume();
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(880, this.ctx.currentTime);
+            gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start();
+            osc.stop(this.ctx.currentTime + 1.5);
+        } catch(e) {}
     }
 };
 
 document.addEventListener('touchstart', () => SoundFX.init(), { once: true });
 document.addEventListener('click', () => SoundFX.init(), { once: true });
-
-function playBeep() {
-    try {
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(880, audioCtx.currentTime);
-        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.start();
-        osc.stop(audioCtx.currentTime + 1.5);
-    } catch(e) {}
-}
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+        SoundFX.init();
+    }
+});
 
 if(!document.getElementById('solo-leveling-enhanced-styles')){
     const styleEl = document.createElement('style');
@@ -133,7 +138,7 @@ if(!document.getElementById('solo-leveling-enhanced-styles')){
             border: 1px solid #a855f7; color: #a855f7; padding: 4px 10px; border-radius: 6px;
             font-size: 12px; font-weight: 800; animation: prMonarchPulse 1.6s infinite ease-in-out; text-transform: uppercase;
         }
-        input:focus, textarea:focus {
+        input:focus, textarea:focus, select:focus {
             outline: none !important; border-color: #a855f7 !important;
             box-shadow: 0 0 10px rgba(168, 85, 247, 0.6) !important;
         }
@@ -176,7 +181,6 @@ const save=()=>localStorage.setItem(KEY,JSON.stringify(db));
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2);
 const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 
-// Cálculo de 1RM Estimado usando a fórmula de Epley
 function calculate1RM(kg, reps) {
     if (!kg || kg <= 0) return 0;
     if (!reps || reps <= 0) return kg;
@@ -256,22 +260,25 @@ function getRequiredXPForLevel(lvl) {
 }
 
 function getUserStats(){
-    const totalWorkouts = db.history.length;
+    let totalWorkouts = 0;
     let totalXP = 0;
     let totalVolume = 0;
     let totalCardioMin = 0;
     let totalSetsDone = 0;
     let totalPRsCount = 0;
-
     const prTracker = {};
 
     db.history.slice().sort((a,b)=>new Date(a.date)-new Date(b.date)).forEach(r => {
+        if (r.workout !== 'CARDIO') totalWorkouts++;
+        
         const cardioMin = parseFloat(r.data?.cardio?.time) || 0;
         const vol = (r.totalVolume || 0);
         totalVolume += vol;
         totalCardioMin += cardioMin;
 
-        totalXP += 100 + Math.floor(cardioMin * 1.5);
+        // Base XP: 100 para treino normal, 20 para registro avulso de cardio
+        const baseXP = r.workout === 'CARDIO' ? 20 : 100;
+        totalXP += baseXP + Math.floor(cardioMin * 1.5);
 
         const wData = DATA[r.workout];
         if(wData){
@@ -288,7 +295,6 @@ function getUserStats(){
                         const reps = parseInt(setData.reps) || 0;
                         const exKey = exInfo[0];
                         
-                        // FILTRAGEM: Apenas séries de Trabalho geram PRs e contagem no histórico
                         if (kg > 0 && isTrabalho) {
                             const prevBest = prTracker[exKey] || { kg: 0, reps: 0 };
                             if (kg > prevBest.kg || (kg === prevBest.kg && reps > prevBest.reps)) {
@@ -316,7 +322,10 @@ function getUserStats(){
     const nextLevelReq = getRequiredXPForLevel(level);
     const progressPct = Math.min(100, Math.floor((accumulatedXP / nextLevelReq) * 100));
     const rank = getRankTitle(level);
-    const lastWorkout = db.history.length ? db.history[db.history.length - 1].date : null;
+    
+    // Pega o último treino real (ignora registros exclusivos de cardio)
+    const realWorkouts = db.history.filter(r => r.workout !== 'CARDIO');
+    const lastWorkout = realWorkouts.length ? realWorkouts[realWorkouts.length - 1].date : null;
 
     return { 
         level, rank, currentLevelXP: accumulatedXP, nextLevelReq, progressPct, 
@@ -406,7 +415,7 @@ function showRestAlertModal() {
 }
 
 function notifyRestDone(){
-    playBeep();
+    SoundFX.playBeep();
     navigator.vibrate?.([500,200,500,200,800]);
     if('Notification' in window && Notification.permission==='granted'){
         try{ new Notification('Solo Leveling',{body:'⏱️ Descanso concluído! Hora de voltar para a série.',icon:'icon.svg',tag:'solo-rest'}); }catch(e){}
@@ -515,6 +524,107 @@ function selectWorkoutScreen(){
             <small style="color:#a855f7; font-weight:bold; margin-top:4px;">Último: ${lastDate}</small>
         </button>`;
     }).join('')}</div>
+    
+    <div class="section-title" style="margin-top:25px; border-bottom:1px solid #333; padding-bottom:5px;">Cardio & Extras</div>
+    <button class="day" style="background: rgba(0,243,255,0.05); border-color: rgba(0,243,255,0.3);" onclick="openCardioScreen()">
+        <strong style="color: #00f3ff; font-size:16px;">🏃 Cardio Avulso</strong>
+        <span style="color: #aaa;">Registrar apenas sessão de cardio</span>
+    </button>
+    </div>`;
+}
+
+function openCardioScreen(){
+    screen = 'cardio';
+    renderCardioScreen();
+}
+
+function renderCardioScreen(){
+    app.innerHTML=`<div class="app">${header('Sessão de Cardio')}
+    <p class="muted">Selecione o dia da semana e informe os dados do seu aeróbico.</p>
+    <div class="card" style="margin-top:15px;">
+        <label>Dia da Semana
+            <select id="cardioDay" style="width:100%; padding:10px; margin-top:5px; background:rgba(0,0,0,0.5); border:1px solid #00f3ff; color:#fff; border-radius:6px;">
+                <option value="Segunda-feira">Segunda-feira</option>
+                <option value="Terça-feira">Terça-feira</option>
+                <option value="Quarta-feira">Quarta-feira</option>
+                <option value="Quinta-feira">Quinta-feira</option>
+                <option value="Sexta-feira">Sexta-feira</option>
+                <option value="Sábado">Sábado</option>
+                <option value="Domingo">Domingo</option>
+            </select>
+        </label>
+        <div class="fields" style="margin-top:12px;">
+            <label>Tempo (min)<input id="cardioTime" type="number" min="0" step="0.1" placeholder="Ex: 30"></label>
+            <label>Distância (km)<input id="cardioDist" type="number" min="0" step="0.01" placeholder="Ex: 5"></label>
+        </div>
+        <div class="fields" style="margin-top:12px;">
+            <label>BPM médio<input id="cardioBpm" type="number" min="0" step="1" placeholder="Ex: 130"></label>
+            <label>Observação<input id="cardioObs" type="text" placeholder="Esteira, Bike..."></label>
+        </div>
+        <button class="primary" style="margin-top:20px; width:100%; padding:14px; font-weight:bold; background: linear-gradient(135deg, #00f3ff, #0096ff); border:none; color:#000;" onclick="finishCardio()">💾 Salvar Sessão</button>
+    </div>
+    </div>`;
+    
+    // Auto-selecionar o dia da semana atual
+    const days = ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'];
+    const today = new Date().getDay();
+    document.getElementById('cardioDay').value = days[today];
+}
+
+function finishCardio(){
+    const time = parseFloat(document.getElementById('cardioTime').value) || 0;
+    const dist = parseFloat(document.getElementById('cardioDist').value) || 0;
+    const bpm = parseInt(document.getElementById('cardioBpm').value) || 0;
+    const obs = document.getElementById('cardioObs').value || '';
+    const day = document.getElementById('cardioDay').value;
+    
+    if(time <= 0) {
+        toast('Insira o tempo de cardio.');
+        return;
+    }
+    
+    const record = {
+        id: uid(),
+        date: new Date().toISOString(),
+        workout: 'CARDIO',
+        name: 'Cardio (' + day + ')',
+        duration: time * 60, // em segundos para compatibilidade
+        restDuration: 0,
+        totalVolume: 0,
+        totalWeightRaw: 0,
+        data: {
+            cardio: { time, dist, bpm, obs, day }
+        }
+    };
+    
+    db.history.push(record);
+    save();
+    
+    SoundFX.playLevelUp();
+    
+    // Renderiza uma tela de vitória simplificada para o cardio
+    const stats = getUserStats();
+    const xpGained = 20 + Math.floor(time * 1.5);
+
+    app.innerHTML = `<div class="app" style="text-align:center; padding-top:30px;">
+        <div style="font-size: 50px;">🏃</div>
+        <h1 style="color:#00f3ff; font-size:24px; text-transform:uppercase; margin-top:8px;">CARDIO CONCLUÍDO!</h1>
+        <div class="muted">Registrado para ${day}</div>
+
+        <div class="card" style="border: 1px solid #00f3ff; background: rgba(0, 243, 255, 0.05); margin-top:15px; text-align:left; box-shadow: 0 0 20px rgba(0,243,255,0.15);">
+            <div style="font-size:14px; font-weight:bold; color:#00f3ff;">+${xpGained} XP ADICIONADOS</div>
+            <div style="font-size:12px; color:#00a3ff; margin-top:2px; font-weight:bold;">TÍTULO: ${esc(stats.rank)}</div>
+            <div style="font-size:18px; font-weight:bold; margin-top:4px;">Nível ${stats.level} <span style="font-size:12px; color:#aaa;">(${stats.progressPct}%)</span></div>
+            <div style="width: 100%; background: rgba(255,255,255,0.1); height: 8px; border-radius: 4px; overflow: hidden; margin-top: 8px;">
+                <div style="width: ${stats.progressPct}%; background: linear-gradient(90deg, #00f3ff, #0096ff); height: 100%;"></div>
+            </div>
+            
+            <div style="margin-top:15px; font-size:13px; border-top:1px solid rgba(255,255,255,0.08); padding-top:10px;">
+                Tempo: <strong style="color:#00f3ff;">${time} min</strong> <br>
+                Distância: <strong style="color:#fff;">${dist > 0 ? dist + ' km' : '--'}</strong>
+            </div>
+        </div>
+        <button class="primary" style="margin-top:25px; width:100%; padding:16px; font-weight:bold; background: linear-gradient(135deg, #00f3ff, #0096ff); color:#000;" onclick="home()">VOLTAR AO PAINEL PRINCIPAL</button>
     </div>`;
 }
 
@@ -529,7 +639,6 @@ function getExercisePR(workoutKey, exIndex) {
         wData.ex.forEach((exInfo, i) => {
             if(exInfo[0] === exName) {
                 expandedGroups(exInfo[1]).forEach((rSet, j) => {
-                    // FILTRAGEM: Apenas séries do tipo Trabalho são avaliadas para PR
                     if(rSet.group[0] === 'Trabalho') {
                         const setData = r.data?.sets?.[`${r.workout}-${i}-${j}`] || {};
                         const kg = parseFloat(setData.kg) || 0;
@@ -551,13 +660,13 @@ function getLastExerciseData(workoutKey, exIndex, setIndex){
         if(record.workout === workoutKey){
             const k = `${workoutKey}-${exIndex}-${setIndex}`;
             const set = record.data?.sets?.[k];
-            if(set && set.kg) return { kg: set.kg, reps: set.reps };
+            if(set && set.kg !== undefined) return { kg: set.kg, reps: set.reps };
         }
     }
     return null;
 }
 
-function draft(){db.drafts[current]??={sets:{},exDone:{},cardio:{},startedAt:null, scheduledRestTotal:0};return db.drafts[current]}
+function draft(){db.drafts[current]??={sets:{},exDone:{},startedAt:null, scheduledRestTotal:0};return db.drafts[current]}
 function openWorkout(k){current=k;screen='workout';draft();save();renderWorkout()}
 function parseQty(q){const m=String(q).match(/(\d+)\s*[–-]\s*(\d+)/);if(m)return Number(m[2]);const n=String(q).match(/\d+/);return n?Number(n[0]):1}
 function expandedGroups(groups){let out=[];groups.forEach((g,gi)=>{const qty=parseQty(g[1]);for(let n=1;n<=qty;n++)out.push({group:g,groupIndex:gi,number:n,total:qty});});return out}
@@ -567,7 +676,7 @@ function calculateDraftMetrics(d){
     let totalVolume = 0;
     let totalWeightRaw = 0;
     Object.values(d.sets||{}).forEach(s => {
-        if(s.done && s.kg){
+        if(s.done && s.kg !== undefined){
             const kg = parseFloat(s.kg) || 0;
             const reps = parseInt(s.reps) || 0;
             totalVolume += (kg * reps);
@@ -593,14 +702,7 @@ function renderWorkout(){
     
     ${v.ex.map((ex,i)=>exerciseHTML(ex,i,d)).join('')}
     
-    <div class="section-title">Cardio do dia</div>
-    <div class="card">
-        <div class="fields"><label>Tempo (min)<input id="cardioTime" type="number" min="0" step="0.1" value="${esc(d.cardio.time||'')}"></label><label>Distância (km)<input id="cardioDist" type="number" min="0" step="0.01" value="${esc(d.cardio.dist||'')}"></label></div>
-        <div class="fields"><label>BPM médio<input id="cardioBpm" type="number" min="0" step="1" value="${esc(d.cardio.bpm||'')}"></label><label>Observação<input id="cardioObs" type="text" value="${esc(d.cardio.obs||'')}"></label></div>
-        <button class="secondary" onclick="saveCardio()">💾 Salvar cardio</button>
-    </div>
-    
-    <button class="finish" style="background: linear-gradient(135deg, #8a2be2, #a855f7);" onclick="finishWorkout()" ${started?'':'disabled'}>✓ Finalizar e salvar treino</button>
+    <button class="finish" style="background: linear-gradient(135deg, #8a2be2, #a855f7); margin-top:20px;" onclick="finishWorkout()" ${started?'':'disabled'}>✓ Finalizar e salvar treino</button>
     <button class="secondary danger" onclick="cancelWorkout()">Sair e manter rascunho</button>
     
     <div class="total-bottom">
@@ -688,12 +790,11 @@ function exerciseHTML(ex,i,d){
         }
         
         const prev = getLastExerciseData(current, i, si);
-        const prevLabel = prev ? `Anterior: ${prev.kg}kg × ${prev.reps}` : '1ª vez';
+        const prevLabel = prev && prev.kg !== undefined ? `Anterior: ${prev.kg}kg × ${prev.reps}` : '1ª vez';
         
         const currentKg = parseFloat(x.kg ?? (prev ? prev.kg : 0)) || 0;
         const currentReps = parseInt(x.reps ?? (prev ? prev.reps : 0)) || 0;
         
-        // FILTRAGEM: Apenas exibe badge de PR caso seja série de TRABALHO
         const isTrabalho = type === 'Trabalho';
         const isPR = isTrabalho && currentKg > 0 && (currentKg > pr.kg || (currentKg === pr.kg && currentReps > pr.reps && pr.kg > 0));
 
@@ -704,14 +805,14 @@ function exerciseHTML(ex,i,d){
             <label style="font-size:11px; font-weight:bold; color:#aaa;">REPS FEITAS
                 <div style="display:flex; gap:4px; align-items:center; margin-top:4px;">
                     <button class="mini" type="button" style="padding:6px 10px; font-size:14px;" onclick="adjustVal(${i},${si},'reps',-1)">-</button>
-                    <input type="number" id="inp-reps-${i}-${si}" min="0" inputmode="numeric" style="font-size:15px; font-weight:bold; text-align:center;" placeholder="${prev?prev.reps:''}" value="${esc(x.reps??'')}" onchange="setVal(${i},${si},'reps',this.value)">
+                    <input type="number" id="inp-reps-${i}-${si}" min="0" inputmode="numeric" style="font-size:15px; font-weight:bold; text-align:center;" placeholder="${prev&&prev.reps!==undefined?prev.reps:''}" value="${esc(x.reps??'')}" onchange="setVal(${i},${si},'reps',this.value)">
                     <button class="mini" type="button" style="padding:6px 10px; font-size:14px;" onclick="adjustVal(${i},${si},'reps',1)">+</button>
                 </div>
             </label>
             <label style="font-size:11px; font-weight:bold; color:#aaa;">CARGA (KG)
                 <div style="display:flex; gap:4px; align-items:center; margin-top:4px;">
                     <button class="mini" type="button" style="padding:6px 10px; font-size:14px;" onclick="adjustVal(${i},${si},'kg',-2.5)">-</button>
-                    <input type="number" id="inp-kg-${i}-${si}" min="0" step="0.5" inputmode="decimal" style="font-size:15px; font-weight:bold; text-align:center;" placeholder="${prev?prev.kg:''}" value="${esc(x.kg??'')}" onchange="setVal(${i},${si},'kg',this.value)">
+                    <input type="number" id="inp-kg-${i}-${si}" min="0" step="0.5" inputmode="decimal" style="font-size:15px; font-weight:bold; text-align:center;" placeholder="${prev&&prev.kg!==undefined?prev.kg:''}" value="${esc(x.kg??'')}" onchange="setVal(${i},${si},'kg',this.value)">
                     <button class="mini" type="button" style="padding:6px 10px; font-size:14px;" onclick="adjustVal(${i},${si},'kg',2.5)">+</button>
                 </div>
             </label>
@@ -730,7 +831,7 @@ function adjustVal(i,j,field,delta){
     let currentVal = parseFloat(d.sets[k][field]);
     if(isNaN(currentVal)){
         const prev = getLastExerciseData(current, i, j);
-        currentVal = prev ? parseFloat(prev[field])||0 : 0;
+        currentVal = prev && prev[field] !== undefined ? parseFloat(prev[field])||0 : 0;
     }
     const newVal = Math.max(0, currentVal + delta);
     d.sets[k][field] = newVal;
@@ -744,11 +845,23 @@ function toggleSet(i,j){
     const d=draft(),k=makeKey(i,j);
     d.sets[k]??={};
 
-    if(d.sets[k].kg === undefined || d.sets[k].reps === undefined){
-        const prev = getLastExerciseData(current, i, j);
-        if(prev){
-            d.sets[k].kg = d.sets[k].kg ?? prev.kg;
-            d.sets[k].reps = d.sets[k].reps ?? prev.reps;
+    if(!d.sets[k].done) {
+        const inpKg = document.getElementById(`inp-kg-${i}-${j}`);
+        const inpReps = document.getElementById(`inp-reps-${i}-${j}`);
+        if (inpKg && inpKg.value !== '') d.sets[k].kg = inpKg.value;
+        if (inpReps && inpReps.value !== '') d.sets[k].reps = inpReps.value;
+
+        if(d.sets[k].kg === undefined || d.sets[k].kg === '' || d.sets[k].reps === undefined || d.sets[k].reps === ''){
+            const prev = getLastExerciseData(current, i, j);
+            if(prev){
+                d.sets[k].kg = (d.sets[k].kg !== undefined && d.sets[k].kg !== '') ? d.sets[k].kg : prev.kg;
+                d.sets[k].reps = (d.sets[k].reps !== undefined && d.sets[k].reps !== '') ? d.sets[k].reps : prev.reps;
+            }
+        }
+
+        if(d.sets[k].kg === undefined || d.sets[k].kg === '' || d.sets[k].reps === undefined || d.sets[k].reps === ''){
+            toast('Preencha a carga e repetição (pode ser 0) para concluir.');
+            return;
         }
     }
 
@@ -784,12 +897,10 @@ function startWorkout(){
     renderWorkout();
 }
 
-function saveCardio(){const d=draft();d.cardio={time:document.getElementById('cardioTime').value,dist:document.getElementById('cardioDist').value,bpm:document.getElementById('cardioBpm').value,obs:document.getElementById('cardioObs').value};save();toast('Cardio salvo')}
-
 function finishWorkout(){
     const d=draft();
     if(!d.startedAt){toast('Inicie o treino antes de finalizar');return}
-    saveCardio();
+    
     const v=DATA[current];
     d.restTotal=restTotalForDraft();
     const metrics = calculateDraftMetrics(d);
@@ -820,8 +931,7 @@ function finishWorkout(){
 
 function showVictoryModal(record){
     const stats = getUserStats();
-    const cardioMin = parseFloat(record.data?.cardio?.time) || 0;
-    const xpGained = 100 + Math.floor(cardioMin * 1.5) + Math.floor(record.totalVolume / 100);
+    const xpGained = 100 + Math.floor(record.totalVolume / 100);
 
     app.innerHTML = `<div class="app" style="text-align:center; padding-top:30px;">
         <div style="font-size: 50px;">⚡</div>
@@ -913,7 +1023,6 @@ function stopGlobalRest(commit=true){
 }
 function stopAllRestTimers(){stopGlobalRest(true)}
 
-// REFORMULAÇÃO COMPLETA DA TELA DE EVOLUÇÃO
 function evolutionScreen(workoutKey = null) {
     stopTotalTimer();
     screen = 'evolution';
@@ -983,7 +1092,6 @@ function renderExerciseEvoDetails(workoutKey, exName) {
                 
                 expandedGroups(exInfo[1]).forEach((rSet, setIndex) => {
                     const isTrabalho = rSet.group[0] === 'Trabalho';
-                    // FILTRAGEM: Apenas séries de Trabalho entram nos cálculos de Evolução e 1RM
                     if (isTrabalho) {
                         const setData = record.data?.sets?.[`${record.workout}-${exIndex}-${setIndex}`] || {};
                         const kg = parseFloat(setData.kg) || 0;
@@ -1031,7 +1139,6 @@ function renderExerciseEvoDetails(workoutKey, exName) {
     const latest = historyPoints[historyPoints.length - 1];
     const oldest = historyPoints[0];
     const kgDiff = latest.kg - oldest.kg;
-    const oneRMDiff = latest.oneRM - oldest.oneRM;
 
     let diffText = 'Primeiro registro';
     if (historyPoints.length > 1) {
@@ -1042,7 +1149,6 @@ function renderExerciseEvoDetails(workoutKey, exName) {
     }
 
     container.innerHTML = `
-    <!-- Topo: Status Atual e Recordes -->
     <div class="card" style="border:1px solid #a855f7; margin-bottom:15px; background:rgba(168,85,247,0.06);">
         <h3 style="color:#fff; margin:0 0 10px 0; font-size:15px;">${esc(exName)}</h3>
         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; font-size:13px;">
@@ -1053,7 +1159,6 @@ function renderExerciseEvoDetails(workoutKey, exName) {
         </div>
     </div>
 
-    <!-- Meio: Visualização de Gráfico Limpo -->
     <div class="card" style="padding:10px; margin-bottom:15px;">
         <div style="font-size:11px; font-weight:bold; color:#aaa; margin-bottom:8px;">PROGRESSÃO DE CARGA ABSOLUTA (KG)</div>
         <div style="position:relative; height:160px; width:100%;">
@@ -1061,7 +1166,6 @@ function renderExerciseEvoDetails(workoutKey, exName) {
         </div>
     </div>
 
-    <!-- Rodapé: Insight Rápido e Histórico detalhado -->
     <div class="card" style="margin-bottom:15px; background:rgba(0,0,0,0.3); border:1px solid rgba(168,85,247,0.3);">
         <div style="font-size:11px; font-weight:bold; color:#a855f7; text-transform:uppercase;">💡 Insight de Evolução</div>
         <div style="font-size:14px; color:#fff; font-weight:bold; margin-top:4px;">${diffText}</div>
@@ -1143,7 +1247,6 @@ function recordsScreen(filterWorkout = 'ALL'){
             const key = filterWorkout === 'ALL' ? `${exName} (${record.workout})` : exName;
 
             expandedGroups(exInfo[1]).forEach((rSet, setIndex) => {
-                // FILTRAGEM RÍGIDA: Apenas séries de Trabalho contam como PR
                 if (rSet.group[0] === 'Trabalho') {
                     const setData = record.data.sets[`${record.workout}-${exIndex}-${setIndex}`] || {};
                     const kg = parseFloat(setData.kg) || 0;
@@ -1201,8 +1304,12 @@ function getWeeklyComparison(){
     db.history.forEach(r => {
         const t = new Date(r.date).getTime();
         const vol = r.totalVolume || 0, dur = r.duration || 0, cardio = parseFloat(r.data?.cardio?.time) || 0;
+        
         if(t >= startThisWeek){
-            thisWeekVol += vol; thisWeekTime += dur; thisWeekCardio += cardio; thisWeekCount++;
+            thisWeekVol += vol; 
+            thisWeekTime += dur; 
+            thisWeekCardio += cardio; 
+            if(r.workout !== 'CARDIO') thisWeekCount++;
         } else if(t >= startLastWeek && t < startThisWeek){
             lastWeekVol += vol;
         }
@@ -1225,16 +1332,19 @@ function historyScreen(){
         html += db.history.slice().reverse().map(r => {
             const d = new Date(r.date);
             const dateStr = `${d.toLocaleDateString('pt-BR')} · ${d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`;
-            return `<div class="card" style="padding:12px; border:1px solid rgba(168,85,247,0.2);">
+            const isCardio = r.workout === 'CARDIO';
+
+            return `<div class="card" style="padding:12px; border:1px solid ${isCardio ? 'rgba(0,243,255,0.2)' : 'rgba(168,85,247,0.2)'};">
                 <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <strong style="font-size:16px; color:#a855f7;">${esc(r.name)}</strong>
+                    <strong style="font-size:16px; color:${isCardio ? '#00f3ff' : '#a855f7'};">${esc(r.name)}</strong>
                     <span style="font-size:11px; color:#aaa;">${dateStr}</span>
                 </div>
                 <div style="font-size:13px; color:#ccc; margin-top:6px;">
-                    ⏱️ ${formatDuration(r.duration)} · 🏋️ ${formatVolume(r.totalVolume || 0)}
+                    ⏱️ ${isCardio ? (r.data?.cardio?.time + ' min') : formatDuration(r.duration)} 
+                    ${!isCardio ? ` · 🏋️ ${formatVolume(r.totalVolume || 0)}` : ` · 🏃 ${r.data?.cardio?.dist || 0} km`}
                 </div>
                 <div style="display:flex; gap:8px; margin-top:10px;">
-                    <button class="secondary" style="flex:2; padding:10px; font-size:13px; font-weight:bold; background:rgba(168,85,247,0.15); border-color:#a855f7;" onclick="viewRecord('${r.id}')">📄 Ver treino</button>
+                    <button class="secondary" style="flex:2; padding:10px; font-size:13px; font-weight:bold; background:rgba(255,255,255,0.05); border-color:${isCardio ? '#00f3ff' : '#a855f7'};" onclick="viewRecord('${r.id}')">📄 Ver detalhes</button>
                     <button class="secondary danger" style="flex:1; padding:8px 10px; font-size:11px; opacity:0.8;" onclick="deleteRecord('${r.id}')">🗑 Excluir</button>
                 </div>
             </div>`;
@@ -1255,32 +1365,38 @@ function deleteRecord(id){
 }
 
 function viewRecord(id){
-    const r=db.history.find(x=>x.id===id),v=DATA[r.workout];
+    const r=db.history.find(x=>x.id===id);
+    const v=DATA[r.workout];
     
     let detailsHtml = `
         <div style="margin-bottom:12px; font-size:13px; color:#aaa;">
             ${new Date(r.date).toLocaleString('pt-BR')}<br>
-            Duração: <strong>${formatDuration(r.duration)}</strong> | Vol: <strong>${formatVolume(r.totalVolume||0)}</strong>
+            Duração: <strong>${r.workout === 'CARDIO' ? (r.data?.cardio?.time + ' min') : formatDuration(r.duration)}</strong>
+            ${r.workout !== 'CARDIO' ? `| Vol: <strong>${formatVolume(r.totalVolume||0)}</strong>` : ''}
         </div>
     `;
 
-    v.ex.forEach((ex,i)=>{
-        detailsHtml+=`<div style="margin-bottom:10px; background:rgba(255,255,255,0.03); padding:8px; border-radius:8px;">
-            <div style="font-weight:bold; font-size:13px; color:#a855f7;">${i+1}. ${esc(ex[0])}</div>`;
-        expandedGroups(ex[1]).forEach((row,j)=>{
-            const x=r.data.sets[`${r.workout}-${i}-${j}`]||{};
-            detailsHtml+=`<div style="font-size:12px; margin-top:4px; display:flex; justify-content:space-between;">
-                <span>Série ${row.number}/${row.total} (${row.group[0]})</span>
-                <strong>${x.kg||'—'} kg × ${x.reps||'—'} reps ${x.done?'✓':''}</strong>
-            </div>`;
+    if (v) {
+        v.ex.forEach((ex,i)=>{
+            detailsHtml+=`<div style="margin-bottom:10px; background:rgba(255,255,255,0.03); padding:8px; border-radius:8px;">
+                <div style="font-weight:bold; font-size:13px; color:#a855f7;">${i+1}. ${esc(ex[0])}</div>`;
+            expandedGroups(ex[1]).forEach((row,j)=>{
+                const x=r.data.sets[`${r.workout}-${i}-${j}`]||{};
+                detailsHtml+=`<div style="font-size:12px; margin-top:4px; display:flex; justify-content:space-between;">
+                    <span>Série ${row.number}/${row.total} (${row.group[0]})</span>
+                    <strong>${x.kg||'—'} kg × ${x.reps||'—'} reps ${x.done?'✓':''}</strong>
+                </div>`;
+            });
+            detailsHtml+=`</div>`;
         });
-        detailsHtml+=`</div>`;
-    });
+    }
 
     const c=r.data.cardio||{};
     if (c.time) {
-        detailsHtml += `<div style="font-size:12px; background:rgba(0,243,255,0.05); padding:8px; border-radius:8px; margin-top:10px;">
-            <strong>Cardio:</strong> ${c.time} min | ${c.dist||'0'} km | ${c.bpm||'—'} BPM
+        detailsHtml += `<div style="font-size:12px; background:rgba(0,243,255,0.05); padding:8px; border-radius:8px; margin-top:10px; border:1px solid rgba(0,243,255,0.3);">
+            <strong style="color:#00f3ff;">Resumo do Cardio:</strong><br>
+            Tempo: ${c.time} min | Distância: ${c.dist||'0'} km | ${c.bpm||'—'} BPM <br>
+            ${c.obs ? `<span style="color:#aaa;"><em>${esc(c.obs)}</em></span>` : ''}
         </div>`;
     }
 
@@ -1288,7 +1404,7 @@ function viewRecord(id){
     modal.className = 'modal-overlay';
     modal.innerHTML = `
         <div class="modal-box">
-            <h3 style="color:#a855f7; margin-top:0;">${esc(r.name)}</h3>
+            <h3 style="color:${r.workout === 'CARDIO' ? '#00f3ff' : '#a855f7'}; margin-top:0;">${esc(r.name)}</h3>
             ${detailsHtml}
             <button class="primary" style="width:100%; padding:10px; margin-top:15px; background:linear-gradient(135deg, #8a2be2, #a855f7);" onclick="this.parentElement.parentElement.remove()">Fechar</button>
         </div>
