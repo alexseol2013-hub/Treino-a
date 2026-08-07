@@ -42,7 +42,7 @@ E:{name:'Treino E',desc:'Bíceps, costas e abdômen',mob:'Mobilidade de ombros e
 ['Abdominal supra na prancha declinada',[['Trabalho','3','RM','45 s']], '3x RM (máximo de repetições possíveis) · intervalo 1 min'] ]}
 };
 
-const KEY='solo_leveling_v14';
+const KEY='solo_leveling_v15';
 
 let db;
 try {
@@ -50,7 +50,16 @@ try {
 } catch (e) {
     db = null;
 }
-db = db || {history:[],drafts:{},user:{name:'Sung Jin-Woo'},restState:{deadline:0,total:0,startedAt:0}};
+db = db || {
+    history:[],
+    drafts:{},
+    user:{name:'Sung Jin-Woo', targetWorkouts: 5, targetCardio: 60},
+    restState:{deadline:0,total:0,startedAt:0}
+};
+
+// Garantir padrões caso campos faltem no storage antigo
+if (!db.user.targetWorkouts) db.user.targetWorkouts = 5;
+if (!db.user.targetCardio) db.user.targetCardio = 60;
 
 let screen='home',current=null,timerId=null,totalTimerId=null;
 let selectedExEvo = null;
@@ -146,7 +155,8 @@ if(!document.getElementById('solo-leveling-enhanced-styles')){
             background: #0d0b18; border: 1px solid #a855f7; border-radius: 16px;
             padding: 20px; width: 90%; max-width: 420px; box-shadow: 0 0 30px rgba(168, 85, 247, 0.4); max-height: 85vh; overflow-y: auto;
         }
-        .tech { font-size: 13px !important; font-weight: bold; color: #a855f7; margin-top: 4px; }
+        .tech { font-size: 14px !important; font-weight: 800; color: #c084fc; background: rgba(168, 85, 247, 0.15); border: 1px solid #a855f7; padding: 6px 10px; border-radius: 6px; margin-top: 8px; display: inline-block; }
+        .tech-inline { font-size: 13px !important; color: #d8b4fe; font-weight: 800; background: rgba(168, 85, 247, 0.2); border-left: 3px solid #a855f7; padding: 6px 8px; margin-top: 6px; border-radius: 0 6px 6px 0; }
         .group-label { font-size: 15px !important; font-weight: bold; color: #a855f7; margin: 12px 0 6px 0; }
         .group-label span { font-size: 13px !important; color: #bbb; font-weight: normal; }
         .total-bottom { margin-bottom: 120px !important; border: 2px solid rgba(168,85,247,0.4) !important; padding: 16px !important; border-radius: 12px; background: rgba(15,12,25,0.8); }
@@ -155,6 +165,9 @@ if(!document.getElementById('solo-leveling-enhanced-styles')){
         .global-rest strong#globalRestClock { font-size: 26px !important; color: #a855f7; }
         .global-rest-actions button.mini { font-size: 13px !important; padding: 8px 12px !important; font-weight: bold !important; border-radius: 6px !important; }
         .global-rest-actions button.mini.start { font-size: 14px !important; padding: 8px 16px !important; background: linear-gradient(135deg, #8a2be2, #a855f7) !important; color: #fff; }
+        
+        .evo-two-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
+        .btn-evo-active { background: linear-gradient(135deg, #8a2be2, #a855f7) !important; color: #fff !important; font-weight: bold; border-color: #a855f7 !important; }
     `;
     document.head.appendChild(styleEl);
 }
@@ -218,20 +231,21 @@ function getRelativeDate(isoString){
 }
 
 function getRankTitle(level) {
-    if (level >= 1000) return "Monarca das Sombras";
-    if (level >= 500)  return "Comandante de Sombras";
-    if (level >= 250)  return "Caçador Rank Nacional";
-    if (level >= 100)  return "Caçador Rank S";
-    if (level >= 75)   return "Caçador Rank A";
-    if (level >= 50)   return "Caçador Rank B";
-    if (level >= 30)   return "Caçador Rank C";
-    if (level >= 15)   return "Caçador Rank D";
-    if (level >= 5)    return "Caçador Rank E";
+    if (level >= 100) return "Monarca das Sombras";
+    if (level >= 80)  return "Comandante de Sombras";
+    if (level >= 65)  return "Caçador Rank Nacional";
+    if (level >= 50)  return "Caçador Rank S";
+    if (level >= 35)  return "Caçador Rank A";
+    if (level >= 25)  return "Caçador Rank B";
+    if (level >= 15)  return "Caçador Rank C";
+    if (level >= 8)   return "Caçador Rank D";
+    if (level >= 3)   return "Caçador Rank E";
     return "Iniciante / Humano";
 }
 
+// Reequilíbrio de curva de progresso (Foco em longevidade de 2 a 3 anos para o topo)
 function getRequiredXPForLevel(lvl) {
-    return Math.floor(120 * Math.pow(lvl, 1.95));
+    return Math.floor(450 * Math.pow(lvl, 2.2));
 }
 
 function getUserStats(){
@@ -250,7 +264,7 @@ function getUserStats(){
         totalVolume += vol;
         totalCardioMin += cardioMin;
 
-        totalXP += 200 + Math.floor(cardioMin * 3);
+        totalXP += 100 + Math.floor(cardioMin * 1.5);
 
         const wData = DATA[r.workout];
         if(wData){
@@ -260,7 +274,7 @@ function getUserStats(){
                     const setData = r.data?.sets?.[`${r.workout}-${i}-${j}`] || {};
                     if(setData.done) {
                         totalSetsDone++;
-                        totalXP += 15;
+                        totalXP += 8;
                         const kg = parseFloat(setData.kg) || 0;
                         const reps = parseInt(setData.reps) || 0;
                         const exKey = exInfo[0];
@@ -269,14 +283,14 @@ function getUserStats(){
                             if (kg > prevBest.kg || (kg === prevBest.kg && reps > prevBest.reps)) {
                                 prTracker[exKey] = { kg, reps };
                                 totalPRsCount++;
-                                totalXP += 300; 
+                                totalXP += 80; 
                             }
                         }
                     } else {
                         exCompleted = false;
                     }
                 });
-                if(exCompleted) totalXP += 60;
+                if(exCompleted) totalXP += 20;
             });
         }
     });
@@ -304,13 +318,13 @@ function getAchievements() {
     const stats = getUserStats();
     const achievements = [
         { id: 'rank_e', title: 'Erguer-se (Rank E)', desc: 'Complete seu 1º treino e entre na Dungeon.', icon: '🗝️', current: stats.totalWorkouts, target: 1 },
-        { id: 'igris', title: 'Sombra de Igris', desc: 'Quebre 5 Recordes Pessoais (PRs).', icon: '🗡️', current: stats.totalPRsCount, target: 5 },
-        { id: 'rank_c', title: 'Caçador Rank C', desc: 'Complete 15 treinos e 50 séries.', icon: '🛡️', current: stats.totalWorkouts, target: 15 },
-        { id: 'tank', title: 'Sombra de Tank', desc: 'Mova mais de 25.000 kg de volume total.', icon: '🐻', current: stats.totalVolume, target: 25000 },
-        { id: 'rank_a', title: 'Caçador Rank A', desc: 'Alcance Nível 25 e 50 treinos finalizados.', icon: '🔮', current: stats.level, target: 25 },
-        { id: 'beru', title: 'Rei Formiga (Beru)', desc: 'Acumule 300 minutos de cardio.', icon: '🐜', current: Math.floor(stats.totalCardioMin), target: 300 },
+        { id: 'igris', title: 'Sombra de Igris', desc: 'Quebre 10 Recordes Pessoais (PRs).', icon: '🗡️', current: stats.totalPRsCount, target: 10 },
+        { id: 'rank_c', title: 'Caçador Rank C', desc: 'Complete 30 treinos e 150 séries.', icon: '🛡️', current: stats.totalWorkouts, target: 30 },
+        { id: 'tank', title: 'Sombra de Tank', desc: 'Mova mais de 100.000 kg de volume total.', icon: '🐻', current: stats.totalVolume, target: 100000 },
+        { id: 'rank_a', title: 'Caçador Rank A', desc: 'Alcance Nível 35 e 100 treinos finalizados.', icon: '🔮', current: stats.level, target: 35 },
+        { id: 'beru', title: 'Rei Formiga (Beru)', desc: 'Acumule 1.000 minutos de cardio.', icon: '🐜', current: Math.floor(stats.totalCardioMin), target: 1000 },
         { id: 'rank_s', title: 'Caçador Rank S', desc: 'Alcance Nível 50 na sua jornada.', icon: '👑', current: stats.level, target: 50 },
-        { id: 'monarch', title: 'Monarca das Sombras', desc: 'Conclua 100 treinos no sistema.', icon: '☠️', current: stats.totalWorkouts, target: 100 }
+        { id: 'monarch', title: 'Monarca das Sombras', desc: 'Conclua 300 treinos no sistema (Anos de dedicação).', icon: '☠️', current: stats.totalWorkouts, target: 300 }
     ];
 
     let unlockedCount = 0;
@@ -396,6 +410,9 @@ function home(){
     const { unlockedCount, totalCount } = getAchievements();
     const weekly = getWeeklyComparison();
     
+    const targetW = db.user.targetWorkouts || 5;
+    const targetC = db.user.targetCardio || 60;
+    
     app.innerHTML=`<div class="app">${header('Painel do Caçador', false)}
     <div class="card" style="background: linear-gradient(135deg, rgba(20,15,35,0.95), rgba(10,8,20,0.98)); border: 1px solid #a855f7; box-shadow: 0 0 25px rgba(168, 85, 247, 0.25); border-radius: 12px; padding: 16px; margin-bottom: 15px;">
         <div style="font-size: 12px; color: #a855f7; text-transform: uppercase; letter-spacing: 1.5px; font-weight:bold;">${esc(stats.rank)}</div>
@@ -411,13 +428,13 @@ function home(){
 
     <div class="card" style="background: rgba(138, 43, 226, 0.08); border: 1px solid rgba(168, 85, 247, 0.3); margin-bottom: 15px; padding: 14px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-            <span style="font-size:13px; font-weight:bold; color:#a855f7; text-transform:uppercase;">🎯 Missão Semanal</span>
+            <span style="font-size:13px; font-weight:bold; color:#a855f7; text-transform:uppercase;">Missão Semanal</span>
             <span style="font-size:11px; font-weight:bold; color:${weekly.volDiffPct>=0?'#a855f7':'#ef4444'};">${weekly.volDiffPct>=0?'↑ +':'↓ '}${weekly.volDiffPct}% Vol. vs sem. anterior</span>
         </div>
-        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px; text-align:center; background:rgba(0,0,0,0.3); padding:8px; border-radius:8px;">
-            <div><small style="font-size:10px; color:#aaa;">Treinos</small><br><strong style="font-size:14px; color:#fff;">${weekly.thisWeekCount}</strong></div>
+        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px; text-align:center; background:rgba(0,0,0,0.3); padding:10px; border-radius:8px;">
+            <div><small style="font-size:10px; color:#aaa;">Treinos</small><br><strong style="font-size:14px; color:#fff;">${weekly.thisWeekCount} / ${targetW}</strong></div>
             <div><small style="font-size:10px; color:#aaa;">Volume</small><br><strong style="font-size:14px; color:#a855f7;">${formatVolume(weekly.thisWeekVolRaw)}</strong></div>
-            <div><small style="font-size:10px; color:#aaa;">Cardio</small><br><strong style="font-size:14px; color:#fff;">${weekly.thisWeekCardio}m</strong></div>
+            <div><small style="font-size:10px; color:#aaa;">Cardio</small><br><strong style="font-size:14px; color:#fff;">${weekly.thisWeekCardio}m / ${targetC}m</strong></div>
         </div>
     </div>
 
@@ -456,7 +473,7 @@ function home(){
             <div class="icon">⚙️</div>
             <div>
                 <div class="title">Ajustes</div>
-                <small style="font-size:11px; color:#aaa;">Perfil & Dados</small>
+                <small style="font-size:11px; color:#aaa;">Perfil & Metas</small>
             </div>
         </div>
         <div class="home-card-btn" onclick="pdfScreen()">
@@ -653,7 +670,7 @@ function exerciseHTML(ex,i,d){
         if(tech){
             const lower=tech.toLowerCase();
             const isLast=si===rows.length-1;
-            if((lower.includes('drop')||lower.includes('rest pause'))&&isLast)special=`<div class="tech-inline" style="font-size:12px; color:#8a2be2; font-weight:bold; margin-top:4px;">${esc(tech)}</div>`;
+            if((lower.includes('drop')||lower.includes('rest pause'))&&isLast)special=`<div class="tech-inline">🔥 ${esc(tech)}</div>`;
         }
         
         const prev = getLastExerciseData(current, i, si);
@@ -788,7 +805,7 @@ function finishWorkout(){
 function showVictoryModal(record){
     const stats = getUserStats();
     const cardioMin = parseFloat(record.data?.cardio?.time) || 0;
-    const xpGained = 200 + Math.floor(cardioMin * 3) + Math.floor(record.totalVolume / 50);
+    const xpGained = 100 + Math.floor(cardioMin * 1.5) + Math.floor(record.totalVolume / 100);
 
     app.innerHTML = `<div class="app" style="text-align:center; padding-top:30px;">
         <div style="font-size: 50px;">⚡</div>
@@ -886,12 +903,12 @@ function evolutionScreen(workoutKey = null) {
 
     if (!workoutKey) {
         let html = `<div class="app">${header('Evolução por Exercício')}
-        <p class="muted">Selecione o treino para explorar o histórico e progresso individual dos exercícios:</p>
-        <div class="grid" style="margin-top:15px;">
+        <p class="muted">Selecione o treino para explorar a sobrecarga progressiva individual:</p>
+        <div class="evo-two-columns">
             ${Object.keys(DATA).map(k => `
-                <button class="day" onclick="evolutionScreen('${k}')">
+                <button class="day" style="margin:0;" onclick="evolutionScreen('${k}')">
                     <strong>${DATA[k].name}</strong>
-                    <span>${DATA[k].desc}</span>
+                    <span style="font-size:11px; color:#aaa;">${DATA[k].desc}</span>
                 </button>
             `).join('')}
         </div></div>`;
@@ -908,7 +925,7 @@ function evolutionScreen(workoutKey = null) {
     let html = `<div class="app">${header(`Evolução: ${workout.name}`)}
     <div style="display:flex; overflow-x:auto; gap:6px; margin-bottom:12px; padding-bottom:4px;">
         ${workout.ex.map(ex => `
-            <button class="${selectedExEvo===ex[0]?'primary':'secondary'}" style="white-space:nowrap; padding:6px 12px; font-size:12px;" onclick="renderExerciseEvoDetails('${workoutKey}', '${esc(ex[0])}')">
+            <button class="${selectedExEvo===ex[0]?'primary btn-evo-active':'secondary'}" style="white-space:nowrap; padding:8px 12px; font-size:12px;" onclick="renderExerciseEvoDetails('${workoutKey}', '${esc(ex[0])}')">
                 ${esc(ex[0])}
             </button>
         `).join('')}
@@ -922,6 +939,17 @@ function evolutionScreen(workoutKey = null) {
 
 function renderExerciseEvoDetails(workoutKey, exName) {
     selectedExEvo = exName;
+    
+    // Atualiza a seleção visual dos botões no topo para corrigir o exercício ativo
+    const buttons = document.querySelectorAll('.app button');
+    buttons.forEach(btn => {
+        if(btn.innerText.trim() === exName) {
+            btn.className = 'primary btn-evo-active';
+        } else if(DATA[workoutKey]?.ex.some(e => e[0] === btn.innerText.trim())) {
+            btn.className = 'secondary';
+        }
+    });
+
     const container = document.getElementById('exerciseEvoContainer');
     if (!container) return;
 
@@ -959,7 +987,7 @@ function renderExerciseEvoDetails(workoutKey, exName) {
         container.innerHTML = `<div class="card" style="text-align:center; padding:20px; margin-top:15px;">
             <div style="font-size:30px; margin-bottom:8px;">📊</div>
             <strong>${esc(exName)}</strong>
-            <p class="muted" style="margin-top:6px; font-size:13px;">Sem dados suficientes registados neste exercício.</p>
+            <p class="muted" style="margin-top:6px; font-size:13px;">Sem dados suficientes registrados neste exercício.</p>
         </div>`;
         return;
     }
@@ -975,7 +1003,7 @@ function renderExerciseEvoDetails(workoutKey, exName) {
 
     container.innerHTML = `
     <div class="card" style="border:1px solid #a855f7; margin-bottom:15px; background:rgba(168,85,247,0.06);">
-        <h3 style="color:#fff; margin:0 0 10px 0; font-size:16px;">${esc(exName)}</h3>
+        <h3 style="color:#fff; margin:0 0 10px 0; font-size:15px;">${esc(exName)}</h3>
         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; font-size:13px;">
             <div>Carga Máxima:<br><strong style="font-size:18px; color:#a855f7;">${bestKg} kg</strong></div>
             <div>Melhor Rep:<br><strong style="font-size:18px; color:#fff;">${bestReps} reps</strong></div>
@@ -985,12 +1013,14 @@ function renderExerciseEvoDetails(workoutKey, exName) {
     </div>
 
     <div class="card" style="padding:10px; margin-bottom:15px;">
-        <div style="font-size:12px; font-weight:bold; color:#aaa; margin-bottom:8px;">GRÁFICO DE PROGRESSÃO DE CARGA</div>
-        <canvas id="evoExCanvas" style="width:100%; height:180px;"></canvas>
+        <div style="font-size:11px; font-weight:bold; color:#aaa; margin-bottom:8px;">PROGRESSÃO DE CARGA (KG)</div>
+        <div style="position:relative; height:160px; width:100%;">
+            <canvas id="evoExCanvas"></canvas>
+        </div>
     </div>
 
     <div class="card">
-        <div style="font-size:12px; font-weight:bold; color:#aaa; margin-bottom:8px;">HISTÓRICO RECENTE</div>
+        <div style="font-size:12px; font-weight:bold; color:#aaa; margin-bottom:8px;">HISTÓRICO DE CARGA</div>
         <div style="display:flex; flex-direction:column; gap:6px;">
             ${historyPoints.slice().reverse().map(p => `
                 <div style="display:flex; justify-content:space-between; font-size:13px; border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:4px;">
@@ -1014,10 +1044,10 @@ function renderExerciseEvoDetails(workoutKey, exName) {
                     label: 'Carga (kg)',
                     data: historyPoints.map(p => p.kg),
                     borderColor: '#a855f7',
-                    backgroundColor: 'rgba(168,85,247,0.2)',
+                    backgroundColor: 'rgba(168,85,247,0.15)',
                     borderWidth: 2,
                     fill: true,
-                    tension: 0.3,
+                    tension: 0.2,
                     pointRadius: 4
                 }]
             },
@@ -1026,8 +1056,8 @@ function renderExerciseEvoDetails(workoutKey, exName) {
                 maintainAspectRatio: false,
                 plugins: { legend: { display: false } },
                 scales: {
-                    x: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } },
-                    y: { ticks: { color: '#888' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+                    x: { ticks: { color: '#888', font:{size:10} }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                    y: { ticks: { color: '#888', font:{size:10} }, grid: { color: 'rgba(255,255,255,0.05)' } }
                 }
             }
         });
@@ -1038,6 +1068,19 @@ function recordsScreen(filterWorkout = 'ALL'){
     stopTotalTimer();
     screen='records';
     currentRecordsFilter = filterWorkout;
+
+    let html = `<div class="app">${header('Recordes Pessoais (PRs)')}
+    <p class="muted">Selecione o treino para filtrar seus recordes ou veja a evolução completa por exercício:</p>
+    
+    <div style="display:flex; overflow-x:auto; gap:6px; margin-bottom:15px; padding-bottom:5px;">
+        <button class="${filterWorkout==='ALL'?'primary':'secondary'}" style="white-space:nowrap; padding:6px 12px; font-size:12px;" onclick="recordsScreen('ALL')">Todos</button>
+        ${Object.keys(DATA).map(k => `<button class="${filterWorkout===k?'primary':'secondary'}" style="white-space:nowrap; padding:6px 12px; font-size:12px;" onclick="recordsScreen('${k}')">Treino ${k}</button>`).join('')}
+    </div>`;
+
+    if (filterWorkout !== 'ALL') {
+        html += `<button class="primary" style="width:100%; padding:12px; margin-bottom:15px; background:linear-gradient(135deg, #8a2be2, #a855f7); font-weight:bold;" onclick="evolutionScreen('${filterWorkout}')">📊 Ver Gráficos & Evolução do ${DATA[filterWorkout].name}</button>`;
+    }
+
     const prMap = {};
 
     db.history.slice().sort((a,b) => new Date(a.date) - new Date(b.date)).forEach(record => {
@@ -1060,18 +1103,12 @@ function recordsScreen(filterWorkout = 'ALL'){
                     const currentBestKg = prMap[key]?.kg || 0;
                     const currentBestReps = prMap[key]?.reps || 0;
                     if(kg > currentBestKg || (kg === currentBestKg && reps > currentBestReps)){
-                        prMap[key] = { keyName: key, kg, reps, dateStr };
+                        prMap[key] = { keyName: key, kg, reps, dateStr, workoutKey: record.workout, exName };
                     }
                 }
             });
         });
     });
-
-    let html = `<div class="app">${header('Recordes Pessoais (PRs)')}
-    <div style="display:flex; overflow-x:auto; gap:6px; margin-bottom:15px; padding-bottom:5px;">
-        <button class="${filterWorkout==='ALL'?'primary':'secondary'}" style="white-space:nowrap; padding:6px 12px; font-size:12px;" onclick="recordsScreen('ALL')">Todos</button>
-        ${Object.keys(DATA).map(k => `<button class="${filterWorkout===k?'primary':'secondary'}" style="white-space:nowrap; padding:6px 12px; font-size:12px;" onclick="recordsScreen('${k}')">Treino ${k}</button>`).join('')}
-    </div>`;
 
     const prList = Object.values(prMap).sort((a,b) => b.kg - a.kg);
     if(prList.length === 0){
@@ -1079,7 +1116,7 @@ function recordsScreen(filterWorkout = 'ALL'){
     } else {
         html += `<div style="display:flex; flex-direction:column; gap:8px;">`;
         prList.forEach(pr => {
-            html += `<div class="card" style="display:flex; justify-content:space-between; align-items:center; padding:12px;">
+            html += `<div class="card" style="display:flex; justify-content:space-between; align-items:center; padding:12px; cursor:pointer;" onclick="renderPRDetailModal('${pr.workoutKey}', '${esc(pr.exName)}')">
                 <div style="flex:1; padding-right:10px;">
                     <div style="font-weight:bold; font-size:14px; line-height:1.2; color:#fff;">🏆 ${esc(pr.keyName)}</div>
                     <div class="muted" style="font-size:11px; margin-top:2px;">Alcançado em ${pr.dateStr}</div>
@@ -1094,6 +1131,11 @@ function recordsScreen(filterWorkout = 'ALL'){
     }
     html += `</div>`;
     app.innerHTML = html;
+}
+
+function renderPRDetailModal(workoutKey, exName) {
+    evolutionScreen(workoutKey);
+    renderExerciseEvoDetails(workoutKey, exName);
 }
 
 function getWeeklyComparison(){
@@ -1138,8 +1180,8 @@ function historyScreen(){
                     ⏱️ ${formatDuration(r.duration)} · 🏋️ ${formatVolume(r.totalVolume || 0)}
                 </div>
                 <div style="display:flex; gap:8px; margin-top:10px;">
-                    <button class="secondary" style="flex:1; padding:8px; font-size:12px;" onclick="viewRecord('${r.id}')">📄 Ver treino</button>
-                    <button class="secondary danger" style="padding:8px 12px; font-size:12px;" onclick="deleteRecord('${r.id}')">🗑 Excluir</button>
+                    <button class="secondary" style="flex:2; padding:10px; font-size:13px; font-weight:bold; background:rgba(168,85,247,0.15); border-color:#a855f7;" onclick="viewRecord('${r.id}')">📄 Ver treino</button>
+                    <button class="secondary danger" style="flex:1; padding:8px 10px; font-size:11px; opacity:0.8;" onclick="deleteRecord('${r.id}')">🗑 Excluir</button>
                 </div>
             </div>`;
         }).join('');
@@ -1241,6 +1283,19 @@ function settingsScreen(){
     </div>
 
     <div class="card" style="margin-bottom:15px;">
+        <div style="font-weight:bold; margin-bottom:8px; color:#a855f7;">🎯 Metas da Missão Semanal</div>
+        <div class="fields" style="margin-bottom:8px;">
+            <label style="font-size:12px;">Qtd. Treinos/Semana
+                <input type="number" id="targetWorkoutsInput" min="1" max="14" value="${db.user.targetWorkouts || 5}">
+            </label>
+            <label style="font-size:12px;">Cardio (Minutos/Semana)
+                <input type="number" id="targetCardioInput" min="0" step="5" value="${db.user.targetCardio || 60}">
+            </label>
+        </div>
+        <button class="secondary" onclick="updateWeeklyTargets()">💾 Salvar Metas Semanais</button>
+    </div>
+
+    <div class="card" style="margin-bottom:15px;">
         <div style="font-weight:bold; margin-bottom:8px; color:#a855f7;">✏️ Editar Exercícios dos Treinos</div>
         <div style="display:flex; flex-direction:column; gap:6px;">
             ${Object.keys(DATA).map(k => `<button class="secondary" style="text-align:left; padding:10px;" onclick="editWorkoutExercises('${k}')">Editar ${DATA[k].name}</button>`).join('')}
@@ -1263,6 +1318,15 @@ function settingsScreen(){
 function updateUserName(){
     const input = document.getElementById('userNameInput').value.trim();
     if(input){ db.user.name = input; save(); toast('Nome atualizado!'); }
+}
+
+function updateWeeklyTargets(){
+    const tw = parseInt(document.getElementById('targetWorkoutsInput').value);
+    const tc = parseInt(document.getElementById('targetCardioInput').value);
+    if(tw > 0) db.user.targetWorkouts = tw;
+    if(!isNaN(tc) && tc >= 0) db.user.targetCardio = tc;
+    save();
+    toast('Metas semanais atualizadas!');
 }
 
 function clearDrafts(){
@@ -1316,4 +1380,4 @@ function pdfScreen(){
 function goHome(){stopTotalTimer();stopAllRestTimers();home()}
 
 home();
-if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js?v=14');
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js?v=15');
