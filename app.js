@@ -215,6 +215,13 @@ function showConfirmModal(title, text, onConfirm) {
 }
 
 function toast(t){const x=document.createElement('div');x.className='toast';x.textContent=t;document.body.appendChild(x);setTimeout(()=>x.remove(),1800)}
+function centerAlert(t){
+    const overlay=document.createElement('div');
+    overlay.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;z-index:10000;padding:24px;pointer-events:none;';
+    overlay.innerHTML=`<div style="background:#0d0b18;border:1px solid #a855f7;border-radius:14px;padding:20px 24px;max-width:340px;text-align:center;color:#fff;font-size:15px;font-weight:600;box-shadow:0 0 30px rgba(168,85,247,0.5);">${esc(t)}</div>`;
+    document.body.appendChild(overlay);
+    setTimeout(()=>overlay.remove(),2000);
+}
 function header(title,homeBack=true){return `<div class="top"><div class="brand">SOLO LEVELING</div><button class="iconbtn" onclick="${homeBack?'goHome()':'settingsScreen()'}">${homeBack?'‹':'⚙'}</button></div><h1 class="screen-title">${title}</h1>`}
 
 function loadChartJS(callback){
@@ -526,8 +533,8 @@ function selectWorkoutScreen(){
     }).join('')}</div>
     
     <div class="section-title" style="margin-top:25px; border-bottom:1px solid #333; padding-bottom:5px;">Cardio & Extras</div>
-    <button class="day" style="background: rgba(0,243,255,0.05); border-color: rgba(0,243,255,0.3);" onclick="openCardioScreen()">
-        <strong style="color: #00f3ff; font-size:16px;">🏃 Cardio Avulso</strong>
+    <button class="day" style="background: rgba(168,85,247,0.08); border-color: rgba(168,85,247,0.4); padding:16px;" onclick="openCardioScreen()">
+        <strong style="color: #a855f7; font-size:17px;">Cardio Avulso</strong>
         <span style="color: #aaa;">Registrar apenas sessão de cardio</span>
     </button>
     </div>`;
@@ -541,9 +548,9 @@ function openCardioScreen(){
 function renderCardioScreen(){
     app.innerHTML=`<div class="app">${header('Sessão de Cardio')}
     <p class="muted">Selecione o dia da semana e informe os dados do seu aeróbico.</p>
-    <div class="card" style="margin-top:15px;">
+    <div class="card" style="margin-top:15px; padding:18px;">
         <label>Dia da Semana
-            <select id="cardioDay" style="width:100%; padding:10px; margin-top:5px; background:rgba(0,0,0,0.5); border:1px solid #00f3ff; color:#fff; border-radius:6px;">
+            <select id="cardioDay" style="width:100%; padding:12px; margin-top:5px; background:rgba(0,0,0,0.5); border:1px solid #a855f7; color:#fff; border-radius:6px; font-size:15px;">
                 <option value="Segunda-feira">Segunda-feira</option>
                 <option value="Terça-feira">Terça-feira</option>
                 <option value="Quarta-feira">Quarta-feira</option>
@@ -553,15 +560,15 @@ function renderCardioScreen(){
                 <option value="Domingo">Domingo</option>
             </select>
         </label>
-        <div class="fields" style="margin-top:12px;">
-            <label>Tempo (min)<input id="cardioTime" type="number" min="0" step="0.1" placeholder="Ex: 30"></label>
-            <label>Distância (km)<input id="cardioDist" type="number" min="0" step="0.01" placeholder="Ex: 5"></label>
+        <div class="fields" style="margin-top:14px;">
+            <label>Tempo (min)<input id="cardioTime" type="number" min="0" step="0.1" placeholder="Ex: 30" style="padding:12px; font-size:15px;"></label>
+            <label>Distância (km)<input id="cardioDist" type="number" min="0" step="0.01" placeholder="Ex: 5" style="padding:12px; font-size:15px;"></label>
         </div>
-        <div class="fields" style="margin-top:12px;">
-            <label>BPM médio<input id="cardioBpm" type="number" min="0" step="1" placeholder="Ex: 130"></label>
-            <label>Observação<input id="cardioObs" type="text" placeholder="Esteira, Bike..."></label>
+        <div class="fields" style="margin-top:14px;">
+            <label>BPM médio<input id="cardioBpm" type="number" min="0" step="1" placeholder="Ex: 130" style="padding:12px; font-size:15px;"></label>
+            <label>Observação<input id="cardioObs" type="text" placeholder="Esteira, Bike..." style="padding:12px; font-size:15px;"></label>
         </div>
-        <button class="primary" style="margin-top:20px; width:100%; padding:14px; font-weight:bold; background: linear-gradient(135deg, #00f3ff, #0096ff); border:none; color:#000;" onclick="finishCardio()">💾 Salvar Sessão</button>
+        <button class="primary" style="margin-top:20px; width:100%; padding:16px; font-weight:bold; font-size:16px; background: linear-gradient(135deg, #8a2be2, #a855f7); border:none; color:#fff; box-shadow: 0 0 15px rgba(138,43,226,0.4);" onclick="finishCardio()">💾 Salvar Sessão</button>
     </div>
     </div>`;
     
@@ -608,23 +615,23 @@ function finishCardio(){
 
     app.innerHTML = `<div class="app" style="text-align:center; padding-top:30px;">
         <div style="font-size: 50px;">🏃</div>
-        <h1 style="color:#00f3ff; font-size:24px; text-transform:uppercase; margin-top:8px;">CARDIO CONCLUÍDO!</h1>
+        <h1 style="color:#a855f7; font-size:24px; text-transform:uppercase; margin-top:8px;">CARDIO CONCLUÍDO!</h1>
         <div class="muted">Registrado para ${day}</div>
 
-        <div class="card" style="border: 1px solid #00f3ff; background: rgba(0, 243, 255, 0.05); margin-top:15px; text-align:left; box-shadow: 0 0 20px rgba(0,243,255,0.15);">
-            <div style="font-size:14px; font-weight:bold; color:#00f3ff;">+${xpGained} XP ADICIONADOS</div>
-            <div style="font-size:12px; color:#00a3ff; margin-top:2px; font-weight:bold;">TÍTULO: ${esc(stats.rank)}</div>
+        <div class="card" style="border: 1px solid #a855f7; background: rgba(168, 85, 247, 0.08); margin-top:15px; text-align:left; box-shadow: 0 0 20px rgba(168,85,247,0.2);">
+            <div style="font-size:14px; font-weight:bold; color:#a855f7;">+${xpGained} XP ADICIONADOS</div>
+            <div style="font-size:12px; color:#c084fc; margin-top:2px; font-weight:bold;">TÍTULO: ${esc(stats.rank)}</div>
             <div style="font-size:18px; font-weight:bold; margin-top:4px;">Nível ${stats.level} <span style="font-size:12px; color:#aaa;">(${stats.progressPct}%)</span></div>
             <div style="width: 100%; background: rgba(255,255,255,0.1); height: 8px; border-radius: 4px; overflow: hidden; margin-top: 8px;">
-                <div style="width: ${stats.progressPct}%; background: linear-gradient(90deg, #00f3ff, #0096ff); height: 100%;"></div>
+                <div style="width: ${stats.progressPct}%; background: linear-gradient(90deg, #8a2be2, #a855f7); height: 100%;"></div>
             </div>
             
             <div style="margin-top:15px; font-size:13px; border-top:1px solid rgba(255,255,255,0.08); padding-top:10px;">
-                Tempo: <strong style="color:#00f3ff;">${time} min</strong> <br>
+                Tempo: <strong style="color:#a855f7;">${time} min</strong> <br>
                 Distância: <strong style="color:#fff;">${dist > 0 ? dist + ' km' : '--'}</strong>
             </div>
         </div>
-        <button class="primary" style="margin-top:25px; width:100%; padding:16px; font-weight:bold; background: linear-gradient(135deg, #00f3ff, #0096ff); color:#000;" onclick="home()">VOLTAR AO PAINEL PRINCIPAL</button>
+        <button class="primary" style="margin-top:25px; width:100%; padding:16px; font-weight:bold; background: linear-gradient(135deg, #8a2be2, #a855f7); color:#fff;" onclick="home()">VOLTAR AO PAINEL PRINCIPAL</button>
     </div>`;
 }
 
@@ -860,7 +867,7 @@ function toggleSet(i,j){
         }
 
         if(d.sets[k].kg === undefined || d.sets[k].kg === '' || d.sets[k].reps === undefined || d.sets[k].reps === ''){
-            toast('Preencha a carga e repetição (pode ser 0) para concluir.');
+            centerAlert('Preencher serie com repetições e cargas antes de concluir');
             return;
         }
     }
@@ -1297,7 +1304,9 @@ function renderPRDetailModal(workoutKey, exName) {
 
 function getWeeklyComparison(){
     const now = new Date();
-    const startThisWeek = new Date(now.setDate(now.getDate() - now.getDay())).setHours(0,0,0,0);
+    const dayIdx = now.getDay(); // 0=domingo, 1=segunda, ... 6=sábado
+    const diffToMonday = (dayIdx === 0) ? 6 : dayIdx - 1;
+    const startThisWeek = new Date(now.setDate(now.getDate() - diffToMonday)).setHours(0,0,0,0);
     const startLastWeek = new Date(startThisWeek - 7*24*60*60*1000).getTime();
     let thisWeekVol = 0, lastWeekVol = 0, thisWeekTime = 0, thisWeekCardio = 0, thisWeekCount = 0;
 
@@ -1334,9 +1343,9 @@ function historyScreen(){
             const dateStr = `${d.toLocaleDateString('pt-BR')} · ${d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`;
             const isCardio = r.workout === 'CARDIO';
 
-            return `<div class="card" style="padding:12px; border:1px solid ${isCardio ? 'rgba(0,243,255,0.2)' : 'rgba(168,85,247,0.2)'};">
+            return `<div class="card" style="padding:12px; border:1px solid rgba(168,85,247,0.2);">
                 <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <strong style="font-size:16px; color:${isCardio ? '#00f3ff' : '#a855f7'};">${esc(r.name)}</strong>
+                    <strong style="font-size:16px; color:#a855f7;">${esc(r.name)}</strong>
                     <span style="font-size:11px; color:#aaa;">${dateStr}</span>
                 </div>
                 <div style="font-size:13px; color:#ccc; margin-top:6px;">
@@ -1344,7 +1353,7 @@ function historyScreen(){
                     ${!isCardio ? ` · 🏋️ ${formatVolume(r.totalVolume || 0)}` : ` · 🏃 ${r.data?.cardio?.dist || 0} km`}
                 </div>
                 <div style="display:flex; gap:8px; margin-top:10px;">
-                    <button class="secondary" style="flex:2; padding:10px; font-size:13px; font-weight:bold; background:rgba(255,255,255,0.05); border-color:${isCardio ? '#00f3ff' : '#a855f7'};" onclick="viewRecord('${r.id}')">📄 Ver detalhes</button>
+                    <button class="secondary" style="flex:2; padding:10px; font-size:13px; font-weight:bold; background:rgba(255,255,255,0.05); border-color:#a855f7;" onclick="viewRecord('${r.id}')">📄 Ver detalhes</button>
                     <button class="secondary danger" style="flex:1; padding:8px 10px; font-size:11px; opacity:0.8;" onclick="deleteRecord('${r.id}')">🗑 Excluir</button>
                 </div>
             </div>`;
@@ -1393,8 +1402,8 @@ function viewRecord(id){
 
     const c=r.data.cardio||{};
     if (c.time) {
-        detailsHtml += `<div style="font-size:12px; background:rgba(0,243,255,0.05); padding:8px; border-radius:8px; margin-top:10px; border:1px solid rgba(0,243,255,0.3);">
-            <strong style="color:#00f3ff;">Resumo do Cardio:</strong><br>
+        detailsHtml += `<div style="font-size:12px; background:rgba(168,85,247,0.08); padding:8px; border-radius:8px; margin-top:10px; border:1px solid rgba(168,85,247,0.3);">
+            <strong style="color:#a855f7;">Resumo do Cardio:</strong><br>
             Tempo: ${c.time} min | Distância: ${c.dist||'0'} km | ${c.bpm||'—'} BPM <br>
             ${c.obs ? `<span style="color:#aaa;"><em>${esc(c.obs)}</em></span>` : ''}
         </div>`;
@@ -1404,7 +1413,7 @@ function viewRecord(id){
     modal.className = 'modal-overlay';
     modal.innerHTML = `
         <div class="modal-box">
-            <h3 style="color:${r.workout === 'CARDIO' ? '#00f3ff' : '#a855f7'}; margin-top:0;">${esc(r.name)}</h3>
+            <h3 style="color:#a855f7; margin-top:0;">${esc(r.name)}</h3>
             ${detailsHtml}
             <button class="primary" style="width:100%; padding:10px; margin-top:15px; background:linear-gradient(135deg, #8a2be2, #a855f7);" onclick="this.parentElement.parentElement.remove()">Fechar</button>
         </div>
