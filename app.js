@@ -564,10 +564,10 @@ function selectWorkoutScreen(){
         </button>`;
     }).join('')}</div>
     
-    <div class="section-title" style="margin-top:25px; border-bottom:1px solid #333; padding-bottom:5px;">Cardio & Extras</div>
-    <button class="day" style="background: rgba(168,85,247,0.08); border-color: rgba(168,85,247,0.4); padding:16px;" onclick="openCardioScreen()">
-        <strong style="color: #a855f7; font-size:17px;">Cardio Avulso</strong>
-        <span style="color: #aaa;">Registrar apenas sessão de cardio</span>
+    <div style="margin-top:25px; border-bottom:1px solid #333;"></div>
+    <button class="day" style="background: rgba(168,85,247,0.08); border-color: rgba(168,85,247,0.4); margin-top:15px;" onclick="openCardioScreen()">
+        <strong style="color: #a855f7;">Cardio</strong>
+        <span style="color: #aaa;">Registre suas sessões de cardio</span>
     </button>
     </div>`;
 }
