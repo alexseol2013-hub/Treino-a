@@ -121,8 +121,21 @@ document.addEventListener('click', () => SoundFX.init(), { once: true });
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
         SoundFX.init();
+        checkRestCompletionNow();
     }
 });
+
+function checkRestCompletionNow(){
+    if (typeof db === 'undefined' || !db.restState?.deadline) return;
+    if (Date.now() >= db.restState.deadline) {
+        const d = typeof draft === 'function' ? draft() : null;
+        if (d) d.restTotal = (d.restTotal || 0) + db.restState.total;
+        db.restState = { deadline: 0, total: 0, startedAt: 0 };
+        save();
+        if (typeof updateGlobalRestUI === 'function') updateGlobalRestUI();
+        if (typeof notifyRestDone === 'function') notifyRestDone();
+    }
+}
 
 if(!document.getElementById('solo-leveling-enhanced-styles')){
     const styleEl = document.createElement('style');
@@ -455,9 +468,14 @@ function showRestAlertModal() {
 
 function notifyRestDone(){
     SoundFX.playBeep();
-    navigator.vibrate?.([500,200,500,200,800]);
+    try {
+        if (navigator.vibrate) {
+            const ok = navigator.vibrate([500,200,500,200,800]);
+            if (!ok) console.warn('Vibração bloqueada pelo navegador (aba sem foco ou não suportado).');
+        }
+    } catch(e) { console.warn('Erro ao vibrar:', e); }
     if('Notification' in window && Notification.permission==='granted'){
-        try{ new Notification('Solo Leveling',{body:'⏱️ Descanso concluído! Hora de voltar para a série.',icon:'icon.svg',tag:'solo-rest'}); }catch(e){}
+        try{ new Notification('Solo Leveling',{body:'⏱️ Descanso concluído! Hora de voltar para a série.',icon:'icon.svg',tag:'solo-rest',vibrate:[500,200,500,200,800],renotify:true}); }catch(e){}
     }
     showRestAlertModal();
 }
@@ -770,7 +788,7 @@ function renderWorkout(){
         if (!timerId) {
             timerId = setInterval(() => {
                 const now = Date.now();
-                if (now >= db.restState.deadline) {
+                if (db.restState?.deadline > 0 && now >= db.restState.deadline) {
                     clearInterval(timerId);
                     timerId = null;
                     const d = draft();
@@ -779,6 +797,9 @@ function renderWorkout(){
                     save();
                     updateGlobalRestUI();
                     notifyRestDone();
+                } else if (!db.restState?.deadline) {
+                    clearInterval(timerId);
+                    timerId = null;
                 } else {
                     updateGlobalRestUI();
                 }
@@ -1034,7 +1055,7 @@ function startGlobalRest(){
     if (timerId) clearInterval(timerId);
     timerId=setInterval(()=>{
         const now = Date.now();
-        if(now >= db.restState.deadline){
+        if(db.restState?.deadline > 0 && now >= db.restState.deadline){
             clearInterval(timerId);
             timerId=null;
             const d=draft();
@@ -1043,6 +1064,9 @@ function startGlobalRest(){
             save();
             updateGlobalRestUI();
             notifyRestDone();
+        } else if (!db.restState?.deadline) {
+            clearInterval(timerId);
+            timerId = null;
         } else {
             updateGlobalRestUI();
         }
