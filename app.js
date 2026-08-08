@@ -269,8 +269,18 @@ function getRankTitle(level) {
     return "Iniciante / Humano";
 }
 
+function getWeekStartMonday(dateInput) {
+    const d = new Date(dateInput);
+    const dayIdx = d.getDay(); // 0=domingo, 1=segunda, ... 6=sábado
+    const diffToMonday = (dayIdx === 0) ? 6 : dayIdx - 1;
+    const start = new Date(d);
+    start.setDate(start.getDate() - diffToMonday);
+    start.setHours(0,0,0,0);
+    return start.getTime();
+}
+
 function getRequiredXPForLevel(lvl) {
-    return Math.floor(450 * Math.pow(lvl, 2.2));
+    return Math.max(1, Math.round(46 * Math.pow(lvl, 1.15)));
 }
 
 function getUserStats(){
@@ -326,6 +336,22 @@ function getUserStats(){
         }
     });
 
+    // Bônus semanal: +500 XP nas semanas em que a meta de treinos E de cardio (min) foram atingidas juntas
+    const weeklyMap = {};
+    db.history.forEach(r => {
+        const weekStart = getWeekStartMonday(r.date);
+        if (!weeklyMap[weekStart]) weeklyMap[weekStart] = { workouts: 0, cardioMin: 0 };
+        if (r.workout !== 'CARDIO') weeklyMap[weekStart].workouts++;
+        weeklyMap[weekStart].cardioMin += parseFloat(r.data?.cardio?.time) || 0;
+    });
+    let weeklyBonusWeeks = 0;
+    Object.values(weeklyMap).forEach(w => {
+        if (w.workouts >= (db.user.targetWorkouts || 5) && w.cardioMin >= (db.user.targetCardio || 60)) {
+            totalXP += 500;
+            weeklyBonusWeeks++;
+        }
+    });
+
     let level = 1;
     let accumulatedXP = totalXP;
     while (accumulatedXP >= getRequiredXPForLevel(level)) {
@@ -350,26 +376,15 @@ function getUserStats(){
 
 function getAchievements() {
     const stats = getUserStats();
+    // Hierarquia do Exército das Sombras — cada rank libera no mesmo Nível do Rank de Caçador equivalente (mesma escala do cabeçalho)
     const achievements = [
-        // Progressão de Caçador (treinos)
-        { id: 'despertar', title: 'Primeiro Despertar', desc: 'Complete seu 1º treino e desperte seu poder.', icon: '🗝️', current: stats.totalWorkouts, target: 1, unit: '' },
-        { id: 'rank_e', title: 'Caçador Rank E', desc: 'Complete 10 treinos.', icon: '🛡️', current: stats.totalWorkouts, target: 10, unit: '' },
-        { id: 'rank_d', title: 'Caçador Rank D', desc: 'Complete 20 treinos.', icon: '🛡️', current: stats.totalWorkouts, target: 20, unit: '' },
-        { id: 'rank_c', title: 'Caçador Rank C', desc: 'Complete 50 treinos.', icon: '🛡️', current: stats.totalWorkouts, target: 50, unit: '' },
-        { id: 'rank_b', title: 'Caçador Rank B', desc: 'Complete 100 treinos.', icon: '⚔️', current: stats.totalWorkouts, target: 100, unit: '' },
-        { id: 'rank_a', title: 'Caçador Rank A', desc: 'Complete 180 treinos.', icon: '🔮', current: stats.totalWorkouts, target: 180, unit: '' },
-        { id: 'rank_s', title: 'Caçador Rank S', desc: 'Complete 280 treinos.', icon: '👑', current: stats.totalWorkouts, target: 280, unit: '' },
-        { id: 'rank_nacional', title: 'Caçador Rank Nacional', desc: 'Complete 400 treinos.', icon: '🎖️', current: stats.totalWorkouts, target: 400, unit: '' },
-        { id: 'monarch', title: 'Monarca das Sombras', desc: 'Complete 550 treinos (Anos de dedicação).', icon: '☠️', current: stats.totalWorkouts, target: 550, unit: '' },
-        { id: 'absoluto', title: 'Ser Absoluto', desc: 'Complete 750 treinos. Além dos Monarcas e Governantes.', icon: '🌌', current: stats.totalWorkouts, target: 750, unit: '' },
-        // Hierarquia do Exército das Sombras (cardio)
-        { id: 'sombra_normal', title: 'Sombra Normal / Básico', desc: 'Soldado raso recém-extraído. Acumule 300 minutos de cardio.', icon: '🪖', current: Math.floor(stats.totalCardioMin), target: 300, unit: ' min' },
-        { id: 'sombra_elite', title: 'Sombra Elite', desc: 'Soldado de destaque tático. Acumule 800 minutos de cardio.', icon: '🗡️', current: Math.floor(stats.totalCardioMin), target: 800, unit: ' min' },
-        { id: 'sombra_cavaleiro', title: 'Cavaleiro das Sombras', desc: 'Sub-liderança com nome próprio. Acumule 1.600 minutos de cardio.', icon: '♞', current: Math.floor(stats.totalCardioMin), target: 1600, unit: ' min' },
-        { id: 'sombra_cavaleiro_elite', title: 'Cavaleiro de Elite', desc: 'Guerreiro equiparável a Rank S. Acumule 2.800 minutos de cardio.', icon: '♘', current: Math.floor(stats.totalCardioMin), target: 2800, unit: ' min' },
-        { id: 'sombra_general', title: 'General das Sombras', desc: 'Alto escalão do exército. Acumule 4.200 minutos de cardio.', icon: '⭐', current: Math.floor(stats.totalCardioMin), target: 4200, unit: ' min' },
-        { id: 'sombra_marechal', title: 'Marechal das Sombras', desc: 'Rivaliza com Nível Nacional. Acumule 6.000 minutos de cardio.', icon: '🎖️', current: Math.floor(stats.totalCardioMin), target: 6000, unit: ' min' },
-        { id: 'sombra_grande_marechal', title: 'Grande Marechal (Bellion)', desc: 'O rank mais alto do exército das sombras. Acumule 8.500 minutos de cardio.', icon: '🐉', current: Math.floor(stats.totalCardioMin), target: 8500, unit: ' min' }
+        { id: 'sombra_normal', title: 'Sombra Normal / Básico', desc: 'Soldado raso recém-extraído, equivalente a caçadores Rank E, D e C. Alcance o Nível 3.', current: stats.level, target: 3, unit: '' },
+        { id: 'sombra_elite', title: 'Sombra Elite', desc: 'Soldado de destaque tático, equivalente a caçadores Rank B. Alcance o Nível 25.', current: stats.level, target: 25, unit: '' },
+        { id: 'sombra_cavaleiro', title: 'Cavaleiro das Sombras', desc: 'Sub-liderança com nome próprio e inteligência avançada. Alcance o Nível 35.', current: stats.level, target: 35, unit: '' },
+        { id: 'sombra_cavaleiro_elite', title: 'Cavaleiro de Elite', desc: 'Guerreiro equiparável a caçadores Rank S. Alcance o Nível 50.', current: stats.level, target: 50, unit: '' },
+        { id: 'sombra_general', title: 'General das Sombras', desc: 'Alto escalão do exército, supera a média dos Rank S. Alcance o Nível 65.', current: stats.level, target: 65, unit: '' },
+        { id: 'sombra_marechal', title: 'Marechal das Sombras', desc: 'Rivaliza com caçadores de Nível Nacional. Alcance o Nível 80.', current: stats.level, target: 80, unit: '' },
+        { id: 'sombra_grande_marechal', title: 'Grande Marechal', desc: 'O rank mais alto e absoluto do exército das sombras. Alcance o Nível 100.', current: stats.level, target: 100, unit: '' }
     ];
 
     let unlockedCount = 0;
@@ -400,7 +415,7 @@ function achievementsScreen() {
             <div style="flex:1;">
                 <div style="display:flex; justify-content:space-between; align-items:baseline;">
                     <strong style="font-size:15px; color:${a.unlocked ? '#a855f7' : '#fff'}">${esc(a.title)}</strong>
-                    ${a.unlocked ? `<span style="font-size:10px; color:#a855f7; font-weight:bold; border:1px solid #a855f7; padding:2px 6px; border-radius:4px;">DESBLOQUEADO</span>` : `<span style="font-size:11px; color:#aaa;">${a.current}${a.unit}/${a.target}${a.unit}</span>`}
+                    ${a.unlocked ? `<span style="font-size:10px; color:#a855f7; font-weight:bold; border:1px solid #a855f7; padding:2px 6px; border-radius:4px;">DESBLOQUEADO</span>` : `<span style="font-size:11px; color:#aaa;">Nível ${a.current}/${a.target}</span>`}
                 </div>
                 <div class="muted" style="font-size:12px; margin-top:2px;">${esc(a.desc)}</div>
                 ${!a.unlocked ? `
