@@ -69,19 +69,21 @@ const app=document.getElementById('app');
 
 const SoundFX = {
     ctx: null,
-    init() {
-        if (!this.ctx) {
-            const AudioCtx = window.AudioContext || window.webkitAudioContext;
-            if (AudioCtx) this.ctx = new AudioCtx();
+    async init() {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        // Se o navegador fechou o contexto (comum após muito tempo em segundo plano/outro app), recria do zero
+        if (!this.ctx || this.ctx.state === 'closed') {
+            try { this.ctx = new AudioCtx(); } catch(e) { this.ctx = null; return; }
         }
-        if (this.ctx && this.ctx.state === 'suspended') {
-            this.ctx.resume();
+        if (this.ctx.state === 'suspended') {
+            try { await this.ctx.resume(); } catch(e) {}
         }
     },
-    playLevelUp() {
+    async playLevelUp() {
         try {
-            this.init();
-            if (!this.ctx) return;
+            await this.init();
+            if (!this.ctx || this.ctx.state !== 'running') return;
             const notes = [523.25, 659.25, 783.99, 1046.50];
             notes.forEach((freq, idx) => {
                 const osc = this.ctx.createOscillator();
@@ -98,11 +100,10 @@ const SoundFX = {
             });
         } catch(e) {}
     },
-    playBeep() {
+    async playBeep() {
         try {
-            this.init();
-            if (!this.ctx) return;
-            if (this.ctx.state === 'suspended') this.ctx.resume();
+            await this.init();
+            if (!this.ctx || this.ctx.state !== 'running') return;
             const osc = this.ctx.createOscillator();
             const gain = this.ctx.createGain();
             osc.type = 'sine';
@@ -155,6 +156,9 @@ if(!document.getElementById('solo-leveling-enhanced-styles')){
             outline: none !important; border-color: #a855f7 !important;
             box-shadow: 0 0 10px rgba(168, 85, 247, 0.6) !important;
         }
+        button:focus, button:focus-visible {
+            outline: none !important;
+        }
         .home-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
         .home-card-btn {
             background: rgba(20, 16, 35, 0.85); border: 1px solid rgba(168, 85, 247, 0.3);
@@ -179,8 +183,8 @@ if(!document.getElementById('solo-leveling-enhanced-styles')){
         .group-label span { font-size: 13px !important; color: #bbb; font-weight: normal; }
         .total-bottom { margin-bottom: 120px !important; border: 2px solid rgba(168,85,247,0.4) !important; padding: 16px !important; border-radius: 12px; background: rgba(15,12,25,0.8); }
         .total-bottom strong#totalTime { font-size: 28px !important; color: #a855f7; }
-        .global-rest { padding: 10px 14px !important; min-height: 75px; background: #0b0914; border-top: 2px solid #a855f7; }
-        .global-rest strong#globalRestClock { font-size: 26px !important; color: #a855f7; }
+        .global-rest { padding: 10px 14px !important; min-height: 92px; background: #0b0914; border-top: 2px solid #a855f7; }
+        .global-rest strong#globalRestClock { font-size: 42px !important; color: #a855f7; }
         .global-rest-actions button.mini { font-size: 13px !important; padding: 8px 12px !important; font-weight: bold !important; border-radius: 6px !important; }
         .global-rest-actions button.mini.start { font-size: 14px !important; padding: 8px 16px !important; background: linear-gradient(135deg, #8a2be2, #a855f7) !important; color: #fff; }
         
