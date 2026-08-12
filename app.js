@@ -106,7 +106,7 @@ const SoundFX = {
             if (!this.ctx || this.ctx.state !== 'running') return;
             const osc = this.ctx.createOscillator();
             const gain = this.ctx.createGain();
-            const duration = 3;
+            const duration = 2;
             osc.type = 'sine';
             osc.frequency.setValueAtTime(880, this.ctx.currentTime);
             gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
@@ -184,9 +184,9 @@ if(!document.getElementById('solo-leveling-enhanced-styles')){
         .tech-inline { font-size: 13px !important; color: #d8b4fe; font-weight: 800; background: rgba(168, 85, 247, 0.2); border-left: 3px solid #a855f7; padding: 6px 8px; margin-top: 6px; border-radius: 0 6px 6px 0; }
         .group-label { font-size: 15px !important; font-weight: bold; color: #a855f7; margin: 12px 0 6px 0; }
         .group-label span { font-size: 13px !important; color: #bbb; font-weight: normal; }
-        .total-bottom { margin-bottom: 120px !important; border: 2px solid rgba(168,85,247,0.4) !important; padding: 16px !important; border-radius: 12px; background: rgba(15,12,25,0.8); }
+        .total-bottom { margin-bottom: 260px !important; border: 2px solid rgba(168,85,247,0.4) !important; padding: 16px !important; border-radius: 12px; background: rgba(15,12,25,0.8); }
         .total-bottom strong#totalTime { font-size: 28px !important; color: #a855f7; }
-        .global-rest { padding: 12px 14px !important; min-height: 112px; background: #0b0914; border-top: 2px solid #a855f7; }
+        .global-rest { padding: 14px !important; min-height: 230px; background: #0b0914; border-top: 2px solid #a855f7; }
         .global-rest strong#globalRestClock { font-size: 42px !important; color: #a855f7; }
         button, .day, .mini, .home-card-btn {
             -webkit-tap-highlight-color: transparent !important;
@@ -198,8 +198,8 @@ if(!document.getElementById('solo-leveling-enhanced-styles')){
         .global-rest-actions button.mini:focus, .global-rest-actions button.mini:active {
             outline: none !important; border-color: #a855f7 !important; box-shadow: 0 0 8px rgba(168,85,247,0.5) !important;
         }
-        .global-rest-actions button.mini.start { font-size: 18px !important; padding: 12px 24px !important; background: linear-gradient(135deg, #8a2be2, #a855f7) !important; color: #fff; border: none !important; }
-        .global-rest-actions button.mini.start:focus, .global-rest-actions button.mini.start:active {
+        .global-rest button.mini.start { font-size: 18px !important; padding: 14px 24px !important; background: linear-gradient(135deg, #8a2be2, #a855f7) !important; color: #fff; border: none !important; border-radius: 8px !important; }
+        .global-rest button.mini.start:focus, .global-rest button.mini.start:active {
             outline: none !important; border: none !important; box-shadow: 0 0 12px rgba(168,85,247,0.7) !important;
         }
         
@@ -791,15 +791,15 @@ function renderWorkout(){
         </div>
     </div></div>
     
-    <div class="global-rest" id="globalRest">
-        <div><small style="font-size:10px; font-weight:bold; color:#aaa;">TEMPORIZADOR DE DESCANSO</small><br><strong id="globalRestClock">00:00</strong></div>
-        <div class="global-rest-actions" style="display:flex; gap:8px; align-items:center; overflow-x:auto; -webkit-overflow-scrolling:touch;">
+    <div class="global-rest" id="globalRest" style="display:flex; flex-direction:column; align-items:center; gap:10px;">
+        <div style="text-align:center;"><small style="font-size:10px; font-weight:bold; color:#aaa;">TEMPORIZADOR DE DESCANSO</small><br><strong id="globalRestClock">00:00</strong></div>
+        <div class="global-rest-actions" style="display:flex; gap:8px; align-items:center; justify-content:center; flex-wrap:wrap; width:100%;">
             <button class="mini" onclick="setGlobalRest(45)">45s</button>
             <button class="mini" onclick="setGlobalRest(60)">1min</button>
             <button class="mini" onclick="setGlobalRest(120)">2min</button>
             <button class="mini" onclick="setGlobalRest(180)">3min</button>
-            <button class="mini start" onclick="startGlobalRest()">Iniciar</button>
         </div>
+        <button class="mini start" onclick="startGlobalRest()" style="width:100%;">Iniciar</button>
     </div>`;
     if(started)startTotalTimer();
     
@@ -942,10 +942,19 @@ function toggleSet(i,j){
     const isMarking = !d.sets[k].done;
 
     if (isMarking) {
+        // Checagem 1: série anterior do MESMO exercício ainda não concluída — bloqueia direto, sem confirmação
+        for (let si = 0; si < j; si++) {
+            if (!d.sets[makeKey(i, si)]?.done) {
+                centerAlert('Você ainda não marcou a série anterior deste exercício.');
+                return;
+            }
+        }
+
+        // Checagem 2: exercício anterior ainda não concluído — pede confirmação
         const firstIncomplete = findFirstIncompleteBefore(i);
         if (firstIncomplete !== -1) {
             const exName = DATA[current].ex[firstIncomplete][0];
-            showConfirmModal('Fora de ordem', `Você ainda não terminou o exercício ${firstIncomplete + 1} (${esc(exName)}). Confirma marcar esta série mesmo assim?`, () => {
+            showConfirmModal('Exercício fora de ordem', `Você ainda não terminou o exercício ${firstIncomplete + 1} (${esc(exName)}). Confirma marcar esta série mesmo assim?`, () => {
                 performToggleSet(i, j);
             });
             return;
@@ -999,7 +1008,7 @@ function toggleEx(i){
         const firstIncomplete = findFirstIncompleteBefore(i);
         if (firstIncomplete !== -1) {
             const exName = DATA[current].ex[firstIncomplete][0];
-            showConfirmModal('Fora de ordem', `Você ainda não terminou o exercício ${firstIncomplete + 1} (${esc(exName)}). Confirma marcar o exercício ${i + 1} como concluído mesmo assim?`, () => {
+            showConfirmModal('Exercício fora de ordem', `Você ainda não terminou o exercício ${firstIncomplete + 1} (${esc(exName)}). Confirma marcar o exercício ${i + 1} como concluído mesmo assim?`, () => {
                 performToggleEx(i);
             });
             return;
