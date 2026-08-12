@@ -106,13 +106,16 @@ const SoundFX = {
             if (!this.ctx || this.ctx.state !== 'running') return;
             const osc = this.ctx.createOscillator();
             const gain = this.ctx.createGain();
+            const duration = 3;
             osc.type = 'sine';
             osc.frequency.setValueAtTime(880, this.ctx.currentTime);
             gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+            gain.gain.setValueAtTime(0.2, this.ctx.currentTime + duration - 0.2);
+            gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
             osc.connect(gain);
             gain.connect(this.ctx.destination);
             osc.start();
-            osc.stop(this.ctx.currentTime + 1.5);
+            osc.stop(this.ctx.currentTime + duration);
         } catch(e) {}
     }
 };
@@ -183,10 +186,22 @@ if(!document.getElementById('solo-leveling-enhanced-styles')){
         .group-label span { font-size: 13px !important; color: #bbb; font-weight: normal; }
         .total-bottom { margin-bottom: 120px !important; border: 2px solid rgba(168,85,247,0.4) !important; padding: 16px !important; border-radius: 12px; background: rgba(15,12,25,0.8); }
         .total-bottom strong#totalTime { font-size: 28px !important; color: #a855f7; }
-        .global-rest { padding: 10px 14px !important; min-height: 92px; background: #0b0914; border-top: 2px solid #a855f7; }
+        .global-rest { padding: 12px 14px !important; min-height: 112px; background: #0b0914; border-top: 2px solid #a855f7; }
         .global-rest strong#globalRestClock { font-size: 42px !important; color: #a855f7; }
-        .global-rest-actions button.mini { font-size: 13px !important; padding: 8px 12px !important; font-weight: bold !important; border-radius: 6px !important; }
-        .global-rest-actions button.mini.start { font-size: 14px !important; padding: 8px 16px !important; background: linear-gradient(135deg, #8a2be2, #a855f7) !important; color: #fff; }
+        button, .day, .mini, .home-card-btn {
+            -webkit-tap-highlight-color: transparent !important;
+        }
+        button:focus, button:focus-visible, button:active {
+            outline: none !important;
+        }
+        .global-rest-actions button.mini { font-size: 16px !important; padding: 12px 16px !important; font-weight: bold !important; border-radius: 8px !important; border: 1px solid rgba(168,85,247,0.35) !important; flex-shrink: 0; }
+        .global-rest-actions button.mini:focus, .global-rest-actions button.mini:active {
+            outline: none !important; border-color: #a855f7 !important; box-shadow: 0 0 8px rgba(168,85,247,0.5) !important;
+        }
+        .global-rest-actions button.mini.start { font-size: 18px !important; padding: 12px 24px !important; background: linear-gradient(135deg, #8a2be2, #a855f7) !important; color: #fff; border: none !important; }
+        .global-rest-actions button.mini.start:focus, .global-rest-actions button.mini.start:active {
+            outline: none !important; border: none !important; box-shadow: 0 0 12px rgba(168,85,247,0.7) !important;
+        }
         
         .evo-two-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
         .btn-evo-active { background: linear-gradient(135deg, #8a2be2, #a855f7) !important; color: #fff !important; font-weight: bold; border-color: #a855f7 !important; }
@@ -778,7 +793,7 @@ function renderWorkout(){
     
     <div class="global-rest" id="globalRest">
         <div><small style="font-size:10px; font-weight:bold; color:#aaa;">TEMPORIZADOR DE DESCANSO</small><br><strong id="globalRestClock">00:00</strong></div>
-        <div class="global-rest-actions" style="display:flex; gap:6px; align-items:center;">
+        <div class="global-rest-actions" style="display:flex; gap:8px; align-items:center; overflow-x:auto; -webkit-overflow-scrolling:touch;">
             <button class="mini" onclick="setGlobalRest(45)">45s</button>
             <button class="mini" onclick="setGlobalRest(60)">1min</button>
             <button class="mini" onclick="setGlobalRest(120)">2min</button>
@@ -905,7 +920,41 @@ function adjustVal(i,j,field,delta){
 
 function setVal(i,j,f,v){const d=draft(),k=makeKey(i,j);d.sets[k]??={};d.sets[k][f]=v;save(); renderWorkout();}
 
+function isExerciseFullyDone(i){
+    const d = draft();
+    if (d.exDone[i]) return true;
+    const ex = DATA[current].ex[i];
+    if (!ex) return true;
+    const rows = expandedGroups(ex[1]);
+    return rows.length > 0 && rows.every((r, si) => d.sets[makeKey(i, si)]?.done);
+}
+
+function findFirstIncompleteBefore(i){
+    for (let e = 0; e < i; e++) {
+        if (!isExerciseFullyDone(e)) return e;
+    }
+    return -1;
+}
+
 function toggleSet(i,j){
+    const d=draft(),k=makeKey(i,j);
+    d.sets[k]??={};
+    const isMarking = !d.sets[k].done;
+
+    if (isMarking) {
+        const firstIncomplete = findFirstIncompleteBefore(i);
+        if (firstIncomplete !== -1) {
+            const exName = DATA[current].ex[firstIncomplete][0];
+            showConfirmModal('Fora de ordem', `Você ainda não terminou o exercício ${firstIncomplete + 1} (${esc(exName)}). Confirma marcar esta série mesmo assim?`, () => {
+                performToggleSet(i, j);
+            });
+            return;
+        }
+    }
+    performToggleSet(i, j);
+}
+
+function performToggleSet(i,j){
     const d=draft(),k=makeKey(i,j);
     d.sets[k]??={};
 
@@ -943,6 +992,23 @@ function toggleSet(i,j){
 }
 
 function toggleEx(i){
+    const d=draft();
+    const isMarking = !d.exDone[i];
+
+    if (isMarking) {
+        const firstIncomplete = findFirstIncompleteBefore(i);
+        if (firstIncomplete !== -1) {
+            const exName = DATA[current].ex[firstIncomplete][0];
+            showConfirmModal('Fora de ordem', `Você ainda não terminou o exercício ${firstIncomplete + 1} (${esc(exName)}). Confirma marcar o exercício ${i + 1} como concluído mesmo assim?`, () => {
+                performToggleEx(i);
+            });
+            return;
+        }
+    }
+    performToggleEx(i);
+}
+
+function performToggleEx(i){
     const d=draft();
     d.exDone[i]=!d.exDone[i];
     save();
