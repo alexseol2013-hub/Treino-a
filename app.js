@@ -609,14 +609,14 @@ function selectWorkoutScreen(){
             <span>${v.desc}</span>
             <small style="color:#a855f7; font-weight:bold; margin-top:4px;">Último: ${lastDate}</small>
         </button>`;
-    }).join('')}</div>
-    
-    <div style="margin-top:25px; border-bottom:1px solid #333;"></div>
-    <button class="day" style="background: rgba(168,85,247,0.08); border-color: rgba(168,85,247,0.4); margin-top:15px;" onclick="openCardioScreen()">
-        <strong style="color: #a855f7; font-size:22px;">Cardio</strong>
+    }).join('')}
+    <div style="border-bottom:1px solid #333; margin:10px 0;"></div>
+    <button class="day" style="background: rgba(168,85,247,0.08); border-color: rgba(168,85,247,0.4);" onclick="openCardioScreen()">
+        <strong style="color: #a855f7;">Cardio</strong>
         <span style="color: #aaa;">Registre suas sessões de cardio</span>
         <small style="color:#a855f7; font-weight:bold; margin-top:4px;">Último: ${getLastCardioDate()}</small>
     </button>
+    </div>
     </div>`;
 }
 
@@ -988,14 +988,6 @@ function performToggleSet(i,j){
         const inpReps = document.getElementById(`inp-reps-${i}-${j}`);
         if (inpKg && inpKg.value !== '') d.sets[k].kg = inpKg.value;
         if (inpReps && inpReps.value !== '') d.sets[k].reps = inpReps.value;
-
-        if(d.sets[k].kg === undefined || d.sets[k].kg === '' || d.sets[k].reps === undefined || d.sets[k].reps === ''){
-            const prev = getLastExerciseData(current, i, j);
-            if(prev){
-                d.sets[k].kg = (d.sets[k].kg !== undefined && d.sets[k].kg !== '') ? d.sets[k].kg : prev.kg;
-                d.sets[k].reps = (d.sets[k].reps !== undefined && d.sets[k].reps !== '') ? d.sets[k].reps : prev.reps;
-            }
-        }
 
         if(d.sets[k].kg === undefined || d.sets[k].kg === '' || d.sets[k].reps === undefined || d.sets[k].reps === ''){
             centerAlert('Preencher serie com repetições e cargas antes de concluir');
