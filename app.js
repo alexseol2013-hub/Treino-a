@@ -169,8 +169,7 @@ if(!document.getElementById('solo-leveling-enhanced-styles')){
             justify-content: space-between; transition: all 0.2s ease; cursor: pointer; color: #fff;
         }
         .home-card-btn:active { transform: scale(0.98); background: rgba(168, 85, 247, 0.2); }
-        .home-card-btn .icon { font-size: 24px; margin-bottom: 6px; }
-        .home-card-btn .title { font-size: 14px; font-weight: bold; color: #e0e0e0; }
+        .home-card-btn .title { font-size: 18px; font-weight: bold; color: #e0e0e0; }
         .modal-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.85); backdrop-filter: blur(4px); z-index: 9999;
@@ -187,7 +186,7 @@ if(!document.getElementById('solo-leveling-enhanced-styles')){
         .total-bottom { margin-bottom: 260px !important; border: 2px solid rgba(168,85,247,0.4) !important; padding: 16px !important; border-radius: 12px; background: rgba(15,12,25,0.8); }
         .total-bottom strong#totalTime { font-size: 28px !important; color: #a855f7; }
         .global-rest { padding: 14px !important; min-height: 230px; background: #0b0914; border-top: 2px solid #a855f7; }
-        .global-rest strong#globalRestClock { font-size: 42px !important; color: #a855f7; }
+        .global-rest strong#globalRestClock { font-size: 42px !important; color: #a855f7; display: block; line-height: 1; margin-top: -4px; }
         button, .day, .mini, .home-card-btn {
             -webkit-tap-highlight-color: transparent !important;
         }
@@ -523,14 +522,24 @@ function home(){
     </div>
 
     <div class="card" style="background: rgba(138, 43, 226, 0.08); border: 1px solid rgba(168, 85, 247, 0.3); margin-bottom: 15px; padding: 14px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <div style="margin-bottom:8px;">
             <span style="font-size:13px; font-weight:bold; color:#a855f7; text-transform:uppercase;">Missão Semanal</span>
-            <span style="font-size:11px; font-weight:bold; color:${weekly.volDiffPct>=0?'#a855f7':'#ef4444'};">${weekly.volDiffPct>=0?'↑ +':'↓ '}${weekly.volDiffPct}% Vol. vs sem. anterior</span>
         </div>
-        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px; text-align:center; background:rgba(0,0,0,0.3); padding:10px; border-radius:8px;">
-            <div><small style="font-size:10px; color:#aaa;">Treinos</small><br><strong style="font-size:14px; color:#fff;">${weekly.thisWeekCount} / ${targetW}</strong></div>
-            <div><small style="font-size:10px; color:#aaa;">Volume</small><br><strong style="font-size:14px; color:#a855f7;">${formatVolume(weekly.thisWeekVolRaw)}</strong></div>
-            <div><small style="font-size:10px; color:#aaa;">Cardio</small><br><strong style="font-size:14px; color:#fff;">${weekly.thisWeekCardio}min / ${targetC}min</strong></div>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; text-align:center; background:rgba(0,0,0,0.3); padding:12px; border-radius:8px;">
+            <div>
+                <small style="font-size:10px; color:#aaa;">Treinos</small><br>
+                <strong style="font-size:16px; color:#fff;">${weekly.thisWeekCount} / ${targetW}</strong>
+                <div style="width:100%; background:rgba(255,255,255,0.1); height:5px; border-radius:3px; overflow:hidden; margin-top:6px;">
+                    <div style="width:${Math.min(100, Math.round(weekly.thisWeekCount/targetW*100))}%; background:#a855f7; height:100%;"></div>
+                </div>
+            </div>
+            <div>
+                <small style="font-size:10px; color:#aaa;">Cardio</small><br>
+                <strong style="font-size:16px; color:#fff;">${weekly.thisWeekCardio}min / ${targetC}min</strong>
+                <div style="width:100%; background:rgba(255,255,255,0.1); height:5px; border-radius:3px; overflow:hidden; margin-top:6px;">
+                    <div style="width:${Math.min(100, Math.round(weekly.thisWeekCardio/targetC*100))}%; background:#a855f7; height:100%;"></div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -538,42 +547,36 @@ function home(){
 
     <div class="home-grid">
         <div class="home-card-btn" onclick="historyScreen()">
-            <div class="icon">📈</div>
             <div>
                 <div class="title">Histórico</div>
                 <small style="font-size:11px; color:#aaa;">Diário de Treinos</small>
             </div>
         </div>
         <div class="home-card-btn" onclick="evolutionScreen()">
-            <div class="icon">📊</div>
             <div>
                 <div class="title">Evolução</div>
                 <small style="font-size:11px; color:#aaa;">Por Exercício</small>
             </div>
         </div>
         <div class="home-card-btn" onclick="recordsScreen(currentRecordsFilter)">
-            <div class="icon">🏆</div>
             <div>
                 <div class="title">Recordes</div>
                 <small style="font-size:11px; color:#aaa;">Seus PRs</small>
             </div>
         </div>
         <div class="home-card-btn" onclick="achievementsScreen()">
-            <div class="icon">☠️</div>
             <div>
                 <div class="title">Conquistas</div>
-                <small style="font-size:11px; color:#a855f7;">${unlockedCount}/${totalCount} Unlocked</small>
+                <small style="font-size:11px; color:#a855f7;">${unlockedCount}/${totalCount} Desbloqueadas</small>
             </div>
         </div>
         <div class="home-card-btn" onclick="settingsScreen()">
-            <div class="icon">⚙️</div>
             <div>
                 <div class="title">Ajustes</div>
                 <small style="font-size:11px; color:#aaa;">Perfil & Metas</small>
             </div>
         </div>
         <div class="home-card-btn" onclick="pdfScreen()">
-            <div class="icon">📄</div>
             <div>
                 <div class="title">Planilha</div>
                 <small style="font-size:11px; color:#aaa;">PDF Original</small>
@@ -589,12 +592,19 @@ function getLastWorkoutDateFor(workoutKey) {
     return rec ? getRelativeDate(rec.date) : 'Nunca realizado';
 }
 
+function wasWorkoutDoneThisWeek(workoutKey) {
+    const startThisWeek = getWeekStartMonday(new Date());
+    return db.history.some(r => r.workout === workoutKey && new Date(r.date).getTime() >= startThisWeek);
+}
+
 function selectWorkoutScreen(){
     app.innerHTML=`<div class="app">${header('Escolha seu treino')}
     <p class="muted">Segunda A · Terça B · Quarta C · Quinta descanso · Sexta D · Sábado E · Domingo descanso.</p>
     <div class="grid" style="margin-top:15px">${Object.entries(DATA).map(([k,v])=>{
         const lastDate = getLastWorkoutDateFor(k);
-        return `<button class="day" onclick="openWorkout('${k}')">
+        const doneThisWeek = wasWorkoutDoneThisWeek(k);
+        return `<button class="day" style="position:relative;" onclick="openWorkout('${k}')">
+            ${doneThisWeek ? `<span style="position:absolute; top:10px; right:12px; color:#5b21b6; font-size:20px; font-weight:900;">✓</span>` : ''}
             <strong>${v.name}</strong>
             <span>${v.desc}</span>
             <small style="color:#a855f7; font-weight:bold; margin-top:4px;">Último: ${lastDate}</small>
@@ -603,10 +613,16 @@ function selectWorkoutScreen(){
     
     <div style="margin-top:25px; border-bottom:1px solid #333;"></div>
     <button class="day" style="background: rgba(168,85,247,0.08); border-color: rgba(168,85,247,0.4); margin-top:15px;" onclick="openCardioScreen()">
-        <strong style="color: #a855f7;">Cardio</strong>
+        <strong style="color: #a855f7; font-size:22px;">Cardio</strong>
         <span style="color: #aaa;">Registre suas sessões de cardio</span>
+        <small style="color:#a855f7; font-weight:bold; margin-top:4px;">Último: ${getLastCardioDate()}</small>
     </button>
     </div>`;
+}
+
+function getLastCardioDate(){
+    const history = db.history.slice().filter(r => r.workout === 'CARDIO').sort((a,b)=>new Date(b.date)-new Date(a.date));
+    return history.length ? getRelativeDate(history[0].date) : 'Nunca realizado';
 }
 
 function openCardioScreen(){
@@ -799,7 +815,7 @@ function renderWorkout(){
             <button class="mini" onclick="setGlobalRest(120)">2min</button>
             <button class="mini" onclick="setGlobalRest(180)">3min</button>
         </div>
-        <button class="mini start" onclick="startGlobalRest()" style="width:100%;">Iniciar</button>
+        <button class="mini start" onclick="startGlobalRest()" style="width:100%;">Iniciar Descanso</button>
     </div>`;
     if(started)startTotalTimer();
     
@@ -997,7 +1013,7 @@ function performToggleSet(i,j){
     
     save();
     renderWorkout();
-    toast(d.sets[k].done ? (allDone ? 'Exercício concluído' : 'Série salva (+15 XP)') : 'Série desmarcada');
+    if (!d.sets[k].done) toast('Série desmarcada');
 }
 
 function toggleEx(i){
