@@ -906,9 +906,9 @@ function exerciseHTML(ex,i,d){
             </label>
             <label style="font-size:11px; font-weight:bold; color:#aaa;">CARGA (KG)
                 <div style="display:flex; gap:4px; align-items:center; margin-top:4px;">
-                    <button class="mini" type="button" style="padding:6px 10px; font-size:14px;" onclick="adjustVal(${i},${si},'kg',-2.5)">-</button>
+                    <button class="mini" type="button" style="padding:6px 10px; font-size:14px;" onclick="adjustVal(${i},${si},'kg',-1)">-</button>
                     <input type="number" id="inp-kg-${i}-${si}" min="0" step="0.5" inputmode="decimal" style="font-size:15px; font-weight:bold; text-align:center;" placeholder="${prev&&prev.kg!==undefined?prev.kg:''}" value="${esc(x.kg??'')}" onchange="setVal(${i},${si},'kg',this.value)">
-                    <button class="mini" type="button" style="padding:6px 10px; font-size:14px;" onclick="adjustVal(${i},${si},'kg',2.5)">+</button>
+                    <button class="mini" type="button" style="padding:6px 10px; font-size:14px;" onclick="adjustVal(${i},${si},'kg',1)">+</button>
                 </div>
             </label>
         </div>
@@ -1359,7 +1359,7 @@ function renderExerciseEvoDetails(workoutKey, exName) {
                 plugins: { legend: { display: false } },
                 scales: {
                     x: { ticks: { color: '#888', font:{size:10} }, grid: { color: 'rgba(255,255,255,0.05)' } },
-                    y: { ticks: { color: '#888', font:{size:10} }, grid: { color: 'rgba(255,255,255,0.05)' } }
+                    y: { ticks: { color: '#888', font:{size:10}, stepSize: 1, precision: 0 }, grid: { color: 'rgba(255,255,255,0.05)' } }
                 }
             }
         });
