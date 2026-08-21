@@ -1278,35 +1278,44 @@ function renderExerciseEvoDetails(workoutKey, exName) {
 
         wData.ex.forEach((exInfo, exIndex) => {
             if (exInfo[0] === exName) {
-                let maxKg = 0, maxReps = 0, dayVolume = 0;
-                
+                let maxKg = 0, maxReps = 0;
+                let volAjuste = 0, volTrabalho = 0;
+
                 expandedGroups(exInfo[1]).forEach((rSet, setIndex) => {
                     const isTrabalho = rSet.group[0] === 'Trabalho';
-                    if (isTrabalho) {
-                        const setData = record.data?.sets?.[`${record.workout}-${exIndex}-${setIndex}`] || {};
-                        const kg = parseFloat(setData.kg) || 0;
-                        const reps = parseInt(setData.reps) || 0;
+                    const setData = record.data?.sets?.[`${record.workout}-${exIndex}-${setIndex}`] || {};
+                    const kg = parseFloat(setData.kg) || 0;
+                    const reps = parseInt(setData.reps) || 0;
+                    const setVol = kg * reps;
 
+                    if (isTrabalho) {
                         if (kg > maxKg || (kg === maxKg && reps > maxReps)) {
                             maxKg = kg; maxReps = reps;
                         }
                         if (kg > bestKg || (kg === bestKg && reps > bestReps)) {
                             bestKg = kg; bestReps = reps;
                         }
-                        dayVolume += kg * reps;
+                        volTrabalho += setVol;
+                    } else {
+                        // Aquecimento + Ajuste contam juntos como volume de ajuste
+                        volAjuste += setVol;
                     }
                 });
 
+                const volTotal = volAjuste + volTrabalho;
+
                 if (maxKg > 0) {
                     const dateStr = new Date(record.date).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'});
-                    if (dayVolume > bestDayVolume) bestDayVolume = dayVolume;
+                    if (volTrabalho > bestDayVolume) bestDayVolume = volTrabalho;
                     historyPoints.push({ 
                         dateStr, 
                         fullDate: new Date(record.date), 
                         kg: maxKg, 
                         reps: maxReps,
                         oneRM: calculate1RM(maxKg, maxReps),
-                        vol: dayVolume
+                        volAjuste,
+                        volTrabalho,
+                        volTotal
                     });
                 }
             }
@@ -1327,20 +1336,27 @@ function renderExerciseEvoDetails(workoutKey, exName) {
     const latest = historyPoints[historyPoints.length - 1];
     const oldest = historyPoints[0];
     const kgDiff = latest.kg - oldest.kg;
-    const volDiff = latest.vol - oldest.vol;
+    const volDiff = latest.volTrabalho - oldest.volTrabalho;
+    const volTotalDiff = latest.volTotal - oldest.volTotal;
 
     let diffText = 'Primeiro registro';
     let volDiffText = 'Primeiro registro';
+    let volTotalDiffText = 'Primeiro registro';
     if (historyPoints.length > 1) {
         const pctGain = oldest.oneRM > 0 ? Math.round(((latest.oneRM - oldest.oneRM) / oldest.oneRM) * 100) : 0;
         diffText = kgDiff >= 0 
             ? `+${kgDiff} kg absoluto (${pctGain >= 0 ? '+' : ''}${pctGain}% de força estim.) desde o 1º registro` 
             : `${kgDiff} kg absoluto (${pctGain}% de força estim.) desde o 1º registro`;
 
-        const pctVolGain = oldest.vol > 0 ? Math.round(((latest.vol - oldest.vol) / oldest.vol) * 100) : 0;
+        const pctVolGain = oldest.volTrabalho > 0 ? Math.round(((latest.volTrabalho - oldest.volTrabalho) / oldest.volTrabalho) * 100) : 0;
         volDiffText = volDiff >= 0
-            ? `+${formatVolume(volDiff)} de volume (${pctVolGain >= 0 ? '+' : ''}${pctVolGain}%) desde o 1º registro`
-            : `${formatVolume(volDiff)} de volume (${pctVolGain}%) desde o 1º registro`;
+            ? `+${formatVolume(volDiff)} de volume de trabalho (${pctVolGain >= 0 ? '+' : ''}${pctVolGain}%) desde o 1º registro`
+            : `${formatVolume(volDiff)} de volume de trabalho (${pctVolGain}%) desde o 1º registro`;
+
+        const pctVolTotalGain = oldest.volTotal > 0 ? Math.round(((latest.volTotal - oldest.volTotal) / oldest.volTotal) * 100) : 0;
+        volTotalDiffText = volTotalDiff >= 0
+            ? `+${formatVolume(volTotalDiff)} de volume total (${pctVolTotalGain >= 0 ? '+' : ''}${pctVolTotalGain}%) desde o 1º registro`
+            : `${formatVolume(volTotalDiff)} de volume total (${pctVolTotalGain}%) desde o 1º registro`;
     }
 
     container.innerHTML = `
@@ -1351,8 +1367,22 @@ function renderExerciseEvoDetails(workoutKey, exName) {
             <div>Recorde 1RM (Força):<br><strong style="font-size:18px; color:#a855f7;">~${maxOneRM} kg</strong></div>
             <div>Último Treino:<br><strong style="color:#c084fc;">${latest.kg} kg × ${latest.reps}</strong></div>
             <div>Último 1RM Estim.:<br><strong style="color:#c084fc;">~${latest.oneRM} kg</strong></div>
-            <div>Maior Volume (dia):<br><strong style="font-size:16px; color:#a855f7;">${formatVolume(bestDayVolume)}</strong></div>
-            <div>Último Volume:<br><strong style="color:#c084fc;">${formatVolume(latest.vol)}</strong></div>
+            <div>Maior Volume de Trabalho (dia):<br><strong style="font-size:16px; color:#a855f7;">${formatVolume(bestDayVolume)}</strong></div>
+            <div>Último Volume de Trabalho:<br><strong style="color:#c084fc;">${formatVolume(latest.volTrabalho)}</strong></div>
+        </div>
+        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px; font-size:12px; margin-top:14px; padding-top:12px; border-top:1px solid rgba(255,255,255,0.08); text-align:center;">
+            <div>
+                <div style="color:#f59e0b; font-weight:bold; font-size:11px; text-transform:uppercase;">Ajuste</div>
+                <strong style="font-size:15px; color:#fff;">${formatVolume(latest.volAjuste)}</strong>
+            </div>
+            <div>
+                <div style="color:#c084fc; font-weight:bold; font-size:11px; text-transform:uppercase;">Trabalho</div>
+                <strong style="font-size:15px; color:#fff;">${formatVolume(latest.volTrabalho)}</strong>
+            </div>
+            <div>
+                <div style="color:#22d3ee; font-weight:bold; font-size:11px; text-transform:uppercase;">Total</div>
+                <strong style="font-size:15px; color:#fff;">${formatVolume(latest.volTotal)}</strong>
+            </div>
         </div>
     </div>
 
@@ -1369,24 +1399,36 @@ function renderExerciseEvoDetails(workoutKey, exName) {
     </div>
 
     <div class="card" style="padding:10px; margin-bottom:15px;">
-        <div style="font-size:11px; font-weight:bold; color:#aaa; margin-bottom:8px;">VOLUME DESTE EXERCÍCIO (KG) — SOMA DE TODAS AS SÉRIES DE TRABALHO</div>
-        <div style="position:relative; height:160px; width:100%;">
+        <div style="font-size:11px; font-weight:bold; color:#aaa; margin-bottom:8px;">VOLUME DESTE EXERCÍCIO (KG) — AJUSTE · TRABALHO · TOTAL</div>
+        <div style="position:relative; height:180px; width:100%;">
             <canvas id="evoVolCanvas"></canvas>
         </div>
     </div>
 
     <div class="card" style="margin-bottom:15px; background:rgba(0,0,0,0.3); border:1px solid rgba(168,85,247,0.3);">
-        <div style="font-size:11px; font-weight:bold; color:#a855f7; text-transform:uppercase;">💡 Insight de Volume</div>
+        <div style="font-size:11px; font-weight:bold; color:#a855f7; text-transform:uppercase;">💡 Insight de Volume de Trabalho</div>
         <div style="font-size:14px; color:#fff; font-weight:bold; margin-top:4px;">${volDiffText}</div>
     </div>
 
+    <div class="card" style="margin-bottom:15px; background:rgba(0,0,0,0.3); border:1px solid rgba(34,211,238,0.3);">
+        <div style="font-size:11px; font-weight:bold; color:#22d3ee; text-transform:uppercase;">💡 Insight de Volume Total</div>
+        <div style="font-size:14px; color:#fff; font-weight:bold; margin-top:4px;">${volTotalDiffText}</div>
+    </div>
+
     <div class="card">
-        <div style="font-size:12px; font-weight:bold; color:#aaa; margin-bottom:8px;">HISTÓRICO DE SÉRIES DE TRABALHO</div>
+        <div style="font-size:12px; font-weight:bold; color:#aaa; margin-bottom:8px;">HISTÓRICO DE SÉRIES</div>
         <div style="display:flex; flex-direction:column; gap:6px;">
             ${historyPoints.slice().reverse().map(p => `
-                <div style="display:flex; justify-content:space-between; font-size:13px; border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:4px;">
-                    <span style="color:#888;">${p.dateStr}</span>
-                    <strong style="color:#a855f7; text-align:right;">${p.kg} kg × ${p.reps} reps <small style="color:#aaa; font-weight:normal;">(1RM ~${p.oneRM}kg · Vol ${formatVolume(p.vol)})</small></strong>
+                <div style="border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:6px;">
+                    <div style="display:flex; justify-content:space-between; font-size:13px;">
+                        <span style="color:#888;">${p.dateStr}</span>
+                        <strong style="color:#a855f7; text-align:right;">${p.kg} kg × ${p.reps} reps <small style="color:#aaa; font-weight:normal;">(1RM ~${p.oneRM}kg)</small></strong>
+                    </div>
+                    <div style="font-size:11px; color:#aaa; text-align:right; margin-top:2px;">
+                        Ajuste <strong style="color:#f59e0b;">${formatVolume(p.volAjuste)}</strong> · 
+                        Trabalho <strong style="color:#c084fc;">${formatVolume(p.volTrabalho)}</strong> · 
+                        Total <strong style="color:#22d3ee;">${formatVolume(p.volTotal)}</strong>
+                    </div>
                 </div>
             `).join('')}
         </div>
@@ -1430,21 +1472,50 @@ function renderExerciseEvoDetails(workoutKey, exName) {
                 type: 'line',
                 data: {
                     labels: historyPoints.map(p => p.dateStr),
-                    datasets: [{
-                        label: 'Volume (kg)',
-                        data: historyPoints.map(p => p.vol),
-                        borderColor: '#c084fc',
-                        backgroundColor: 'rgba(192,132,252,0.15)',
-                        borderWidth: 2,
-                        fill: true,
-                        tension: 0.2,
-                        pointRadius: 4
-                    }]
+                    datasets: [
+                        {
+                            label: 'Ajuste',
+                            data: historyPoints.map(p => p.volAjuste),
+                            borderColor: '#f59e0b',
+                            backgroundColor: 'rgba(245,158,11,0.1)',
+                            borderWidth: 2,
+                            fill: false,
+                            tension: 0.2,
+                            pointRadius: 3
+                        },
+                        {
+                            label: 'Trabalho',
+                            data: historyPoints.map(p => p.volTrabalho),
+                            borderColor: '#c084fc',
+                            backgroundColor: 'rgba(192,132,252,0.15)',
+                            borderWidth: 2,
+                            fill: false,
+                            tension: 0.2,
+                            pointRadius: 3
+                        },
+                        {
+                            label: 'Total',
+                            data: historyPoints.map(p => p.volTotal),
+                            borderColor: '#22d3ee',
+                            backgroundColor: 'rgba(34,211,238,0.1)',
+                            borderWidth: 2,
+                            borderDash: [5,3],
+                            fill: false,
+                            tension: 0.2,
+                            pointRadius: 3
+                        }
+                    ]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: { color: '#ccc', font: { size: 10 }, boxWidth: 12, padding: 8 }
+                        }
+                    },
                     scales: {
                         x: { ticks: { color: '#888', font:{size:10} }, grid: { color: 'rgba(255,255,255,0.05)' } },
                         y: { ticks: { color: '#888', font:{size:10} }, grid: { color: 'rgba(255,255,255,0.05)' } }
