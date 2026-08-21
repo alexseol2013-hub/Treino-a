@@ -42,6 +42,42 @@ E:{name:'Treino E',desc:'Bíceps, costas e abdômen',mob:'Mobilidade de ombros e
 ['Abdominal supra na prancha declinada',[['Trabalho','3','RM','45 s']], '3x RM (máximo de repetições possíveis) · intervalo 1 min'] ]}
 };
 
+const HOTMART_BASE = 'https://hotmart.com/en/club/alem-da-genetica-20/products/6315578/content/';
+const EXERCISE_VIDEOS = {
+    'Supino inclinado com halteres ou máquina': HOTMART_BASE + 'ROxVN05geD',
+    'Supino reto com halteres ou máquina': HOTMART_BASE + '0OvaZK3W7j',
+    'Supino declinado barra ou máquina': HOTMART_BASE + 'EOg2BM3V76',
+    'Voador com 2 segundos de pico de contração': HOTMART_BASE + 'BOn0xNLZeR',
+    'Elevação frontal': HOTMART_BASE + 'gOpb3XPXeJ',
+    'Elevação lateral sentado com halteres': HOTMART_BASE + 'LO0BJYpYeG',
+    'Tríceps francês na corda': HOTMART_BASE + 'meL9m62a7n',
+    'Remada curvada com barra com 2 segundos de pico de contração': HOTMART_BASE + 'Me1vJd8y7Y',
+    'Remada baixa triângulo com 2 segundos de pico de contração': HOTMART_BASE + 'M7G9mNW84w',
+    'Remada baixa pegada aberta ou máquina pegada aberta com 2 segundos de pico de contração': HOTMART_BASE + 'k45QpJXo4l',
+    'Pulley frente triângulo com 2 segundos de pico de contração': HOTMART_BASE + 'V7yxjABGeJ',
+    'Meio Terra': HOTMART_BASE + 'oODgJbWN7P',
+    'Hiper extensão no banco romano': HOTMART_BASE + 'ROxVN0JyeD',
+    'Rosca scott máquina com 2 segundos de pico de contração': HOTMART_BASE + 'V4V1mvJVO2',
+    'Agachamento livre': HOTMART_BASE + 'PeAgJjv0OW',
+    'Leg 45': HOTMART_BASE + 'o4EgJZaq7z',
+    'Extensor com 2 segundos de pico de contração': HOTMART_BASE + 'k7Q1mdY57y',
+    'Flexor deitado com 2 segundos de pico de contração': HOTMART_BASE + 'BeZNmrglew',
+    'Stiff': HOTMART_BASE + '37d8mx9P7L',
+    'Elevação de quadril com 2 segundos de pico de contração': HOTMART_BASE + 'BeZNmQVXew',
+    'Panturrilha em pé na máquina ou no smith com 2 segundos de pico de contração': HOTMART_BASE + 'V7yxjrLPeJ',
+    'Desenvolvimento com halteres': HOTMART_BASE + 'k45QpJnr4l',
+    'Elevação lateral máquina ou unilateral no cabo': HOTMART_BASE + 'kOXomd6W7W',
+    'Tríceps corda com 2 segundos de pico de contração': HOTMART_BASE + 'b4K9m3Ww7X',
+    'Tríceps testa corda banco 35 graus': HOTMART_BASE + 'gOpb3XkbeJ',
+    'Rosca direta cabo com 2 segundos de pico de contração': HOTMART_BASE + 'a4RYm3zrOn',
+    'Rosca scott máquina ou no cabo com 2 segundos de pico de contração': HOTMART_BASE + 'V4V1mvJVO2',
+    'Rosca direta corda': HOTMART_BASE + 'M7qdMA5Rex',
+    'Pulley frente aberto com 2 segundos de pico de contração': HOTMART_BASE + 'EOg2BM0E76',
+    'Serrote com 2 segundos de pico de contração': HOTMART_BASE + 'z7rBEyRN7j',
+    'Abdominal infra na torre com 2 segundos de pico de contração': HOTMART_BASE + 'NOwQ2dg2em',
+    'Abdominal supra na prancha declinada': HOTMART_BASE + 'oODgJyMx7P'
+};
+
 const KEY='solo_leveling_v15';
 
 let db;
@@ -64,6 +100,7 @@ let screen='home',current=null,timerId=null,totalTimerId=null;
 let selectedExEvo = null;
 let currentRecordsFilter = 'ALL';
 let activeChartInstance = null;
+let activeVolChartInstance = null;
 let wakeLock = null;
 const app=document.getElementById('app');
 
@@ -865,7 +902,10 @@ function exerciseHTML(ex,i,d){
     let html=`<div class="card" style="padding:14px; margin-top:12px;">
         <div class="exercise-head" style="display:flex; justify-content:space-between; align-items:center;">
             <div class="exercise-name" style="flex:1; font-size:16px !important; font-weight:bold; color:#fff;">${i+1}. ${esc(name)}</div>
-            <button class="mini" type="button" style="margin-left:8px; font-size:11px; padding:4px 8px;" onclick="swapExercise(${i})">🔄 Trocar</button>
+            <div style="display:flex; gap:6px; margin-left:8px;">
+                ${EXERCISE_VIDEOS[name] ? `<a class="mini" href="${EXERCISE_VIDEOS[name]}" target="_blank" rel="noopener" style="font-size:11px; padding:4px 8px; text-decoration:none; display:inline-flex; align-items:center;">🎬 Vídeo</a>` : ''}
+                <button class="mini" type="button" style="font-size:11px; padding:4px 8px;" onclick="swapExercise(${i})">🔄 Trocar</button>
+            </div>
         </div>
         ${tech?`<div class="tech">⚡ ${esc(tech)}</div>`:''}`;
     
@@ -1229,7 +1269,7 @@ function renderExerciseEvoDetails(workoutKey, exName) {
     if (!container) return;
 
     const historyPoints = [];
-    let bestKg = 0, bestReps = 0, maxOneRM = 0;
+    let bestKg = 0, bestReps = 0, bestDayVolume = 0;
 
     db.history.slice().sort((a,b)=>new Date(a.date)-new Date(b.date)).forEach(record => {
         if (record.workout !== workoutKey) return;
@@ -1238,7 +1278,7 @@ function renderExerciseEvoDetails(workoutKey, exName) {
 
         wData.ex.forEach((exInfo, exIndex) => {
             if (exInfo[0] === exName) {
-                let maxKg = 0, maxReps = 0, dayBest1RM = 0;
+                let maxKg = 0, maxReps = 0, dayVolume = 0;
                 
                 expandedGroups(exInfo[1]).forEach((rSet, setIndex) => {
                     const isTrabalho = rSet.group[0] === 'Trabalho';
@@ -1246,7 +1286,6 @@ function renderExerciseEvoDetails(workoutKey, exName) {
                         const setData = record.data?.sets?.[`${record.workout}-${exIndex}-${setIndex}`] || {};
                         const kg = parseFloat(setData.kg) || 0;
                         const reps = parseInt(setData.reps) || 0;
-                        const estimated1RM = calculate1RM(kg, reps);
 
                         if (kg > maxKg || (kg === maxKg && reps > maxReps)) {
                             maxKg = kg; maxReps = reps;
@@ -1254,28 +1293,27 @@ function renderExerciseEvoDetails(workoutKey, exName) {
                         if (kg > bestKg || (kg === bestKg && reps > bestReps)) {
                             bestKg = kg; bestReps = reps;
                         }
-                        if (estimated1RM > dayBest1RM) {
-                            dayBest1RM = estimated1RM;
-                        }
-                        if (estimated1RM > maxOneRM) {
-                            maxOneRM = estimated1RM;
-                        }
+                        dayVolume += kg * reps;
                     }
                 });
 
                 if (maxKg > 0) {
                     const dateStr = new Date(record.date).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'});
+                    if (dayVolume > bestDayVolume) bestDayVolume = dayVolume;
                     historyPoints.push({ 
                         dateStr, 
                         fullDate: new Date(record.date), 
                         kg: maxKg, 
                         reps: maxReps,
-                        oneRM: dayBest1RM
+                        oneRM: calculate1RM(maxKg, maxReps),
+                        vol: dayVolume
                     });
                 }
             }
         });
     });
+
+    const maxOneRM = calculate1RM(bestKg, bestReps);
 
     if (historyPoints.length === 0) {
         container.innerHTML = `<div class="card" style="text-align:center; padding:20px; margin-top:15px;">
@@ -1289,13 +1327,20 @@ function renderExerciseEvoDetails(workoutKey, exName) {
     const latest = historyPoints[historyPoints.length - 1];
     const oldest = historyPoints[0];
     const kgDiff = latest.kg - oldest.kg;
+    const volDiff = latest.vol - oldest.vol;
 
     let diffText = 'Primeiro registro';
+    let volDiffText = 'Primeiro registro';
     if (historyPoints.length > 1) {
         const pctGain = oldest.oneRM > 0 ? Math.round(((latest.oneRM - oldest.oneRM) / oldest.oneRM) * 100) : 0;
         diffText = kgDiff >= 0 
             ? `+${kgDiff} kg absoluto (${pctGain >= 0 ? '+' : ''}${pctGain}% de força estim.) desde o 1º registro` 
             : `${kgDiff} kg absoluto (${pctGain}% de força estim.) desde o 1º registro`;
+
+        const pctVolGain = oldest.vol > 0 ? Math.round(((latest.vol - oldest.vol) / oldest.vol) * 100) : 0;
+        volDiffText = volDiff >= 0
+            ? `+${formatVolume(volDiff)} de volume (${pctVolGain >= 0 ? '+' : ''}${pctVolGain}%) desde o 1º registro`
+            : `${formatVolume(volDiff)} de volume (${pctVolGain}%) desde o 1º registro`;
     }
 
     container.innerHTML = `
@@ -1306,6 +1351,8 @@ function renderExerciseEvoDetails(workoutKey, exName) {
             <div>Recorde 1RM (Força):<br><strong style="font-size:18px; color:#a855f7;">~${maxOneRM} kg</strong></div>
             <div>Último Treino:<br><strong style="color:#c084fc;">${latest.kg} kg × ${latest.reps}</strong></div>
             <div>Último 1RM Estim.:<br><strong style="color:#c084fc;">~${latest.oneRM} kg</strong></div>
+            <div>Maior Volume (dia):<br><strong style="font-size:16px; color:#a855f7;">${formatVolume(bestDayVolume)}</strong></div>
+            <div>Último Volume:<br><strong style="color:#c084fc;">${formatVolume(latest.vol)}</strong></div>
         </div>
     </div>
 
@@ -1321,13 +1368,25 @@ function renderExerciseEvoDetails(workoutKey, exName) {
         <div style="font-size:14px; color:#fff; font-weight:bold; margin-top:4px;">${diffText}</div>
     </div>
 
+    <div class="card" style="padding:10px; margin-bottom:15px;">
+        <div style="font-size:11px; font-weight:bold; color:#aaa; margin-bottom:8px;">VOLUME DESTE EXERCÍCIO (KG) — SOMA DE TODAS AS SÉRIES DE TRABALHO</div>
+        <div style="position:relative; height:160px; width:100%;">
+            <canvas id="evoVolCanvas"></canvas>
+        </div>
+    </div>
+
+    <div class="card" style="margin-bottom:15px; background:rgba(0,0,0,0.3); border:1px solid rgba(168,85,247,0.3);">
+        <div style="font-size:11px; font-weight:bold; color:#a855f7; text-transform:uppercase;">💡 Insight de Volume</div>
+        <div style="font-size:14px; color:#fff; font-weight:bold; margin-top:4px;">${volDiffText}</div>
+    </div>
+
     <div class="card">
         <div style="font-size:12px; font-weight:bold; color:#aaa; margin-bottom:8px;">HISTÓRICO DE SÉRIES DE TRABALHO</div>
         <div style="display:flex; flex-direction:column; gap:6px;">
             ${historyPoints.slice().reverse().map(p => `
                 <div style="display:flex; justify-content:space-between; font-size:13px; border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:4px;">
                     <span style="color:#888;">${p.dateStr}</span>
-                    <strong style="color:#a855f7;">${p.kg} kg × ${p.reps} reps <small style="color:#aaa; font-weight:normal;">(1RM ~${p.oneRM}kg)</small></strong>
+                    <strong style="color:#a855f7; text-align:right;">${p.kg} kg × ${p.reps} reps <small style="color:#aaa; font-weight:normal;">(1RM ~${p.oneRM}kg · Vol ${formatVolume(p.vol)})</small></strong>
                 </div>
             `).join('')}
         </div>
@@ -1335,34 +1394,64 @@ function renderExerciseEvoDetails(workoutKey, exName) {
 
     loadChartJS(() => {
         const ctx = document.getElementById('evoExCanvas')?.getContext('2d');
-        if (!ctx) return;
-        if (activeChartInstance) activeChartInstance.destroy();
-
-        activeChartInstance = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: historyPoints.map(p => p.dateStr),
-                datasets: [{
-                    label: 'Carga (kg)',
-                    data: historyPoints.map(p => p.kg),
-                    borderColor: '#a855f7',
-                    backgroundColor: 'rgba(168,85,247,0.15)',
-                    borderWidth: 2,
-                    fill: true,
-                    tension: 0.2,
-                    pointRadius: 4
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                    x: { ticks: { color: '#888', font:{size:10} }, grid: { color: 'rgba(255,255,255,0.05)' } },
-                    y: { ticks: { color: '#888', font:{size:10}, stepSize: 1, precision: 0 }, grid: { color: 'rgba(255,255,255,0.05)' } }
+        if (ctx) {
+            if (activeChartInstance) activeChartInstance.destroy();
+            activeChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: historyPoints.map(p => p.dateStr),
+                    datasets: [{
+                        label: 'Carga (kg)',
+                        data: historyPoints.map(p => p.kg),
+                        borderColor: '#a855f7',
+                        backgroundColor: 'rgba(168,85,247,0.15)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.2,
+                        pointRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: '#888', font:{size:10} }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                        y: { ticks: { color: '#888', font:{size:10}, stepSize: 1, precision: 0 }, grid: { color: 'rgba(255,255,255,0.05)' } }
+                    }
                 }
-            }
-        });
+            });
+        }
+
+        const volCtx = document.getElementById('evoVolCanvas')?.getContext('2d');
+        if (volCtx) {
+            if (activeVolChartInstance) activeVolChartInstance.destroy();
+            activeVolChartInstance = new Chart(volCtx, {
+                type: 'line',
+                data: {
+                    labels: historyPoints.map(p => p.dateStr),
+                    datasets: [{
+                        label: 'Volume (kg)',
+                        data: historyPoints.map(p => p.vol),
+                        borderColor: '#c084fc',
+                        backgroundColor: 'rgba(192,132,252,0.15)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.2,
+                        pointRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: '#888', font:{size:10} }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                        y: { ticks: { color: '#888', font:{size:10} }, grid: { color: 'rgba(255,255,255,0.05)' } }
+                    }
+                }
+            });
+        }
     });
 }
 
@@ -1406,9 +1495,8 @@ function recordsScreen(filterWorkout = 'ALL'){
                     if(kg > 0) {
                         const currentBestKg = prMap[key]?.kg || 0;
                         const currentBestReps = prMap[key]?.reps || 0;
-                        const currentBest1RM = prMap[key]?.est1RM || 0;
 
-                        if(kg > currentBestKg || (kg === currentBestKg && reps > currentBestReps) || est1RM > currentBest1RM){
+                        if(kg > currentBestKg || (kg === currentBestKg && reps > currentBestReps)){
                             prMap[key] = { keyName: key, kg, reps, est1RM, dateStr, workoutKey: record.workout, exName };
                         }
                     }
