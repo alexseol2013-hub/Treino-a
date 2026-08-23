@@ -559,10 +559,10 @@ function home(){
         </div>
     </div>
 
-    <div class="card" style="background: ${weeklyMissionDone ? 'rgba(34,197,94,0.10)' : 'rgba(138, 43, 226, 0.08)'}; border: 1px solid ${weeklyMissionDone ? '#22c55e' : 'rgba(168, 85, 247, 0.3)'}; margin-bottom: 15px; padding: 14px; ${weeklyMissionDone ? 'box-shadow: 0 0 15px rgba(34,197,94,0.25);' : ''}">
+    <div class="card" style="background: ${weeklyMissionDone ? 'rgba(168, 85, 247, 0.14)' : 'rgba(138, 43, 226, 0.08)'}; border: 1px solid ${weeklyMissionDone ? '#a855f7' : 'rgba(168, 85, 247, 0.3)'}; margin-bottom: 15px; padding: 14px; ${weeklyMissionDone ? 'box-shadow: 0 0 15px rgba(168,85,247,0.35);' : ''}">
         <div style="margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
-            <span style="font-size:13px; font-weight:bold; color:${weeklyMissionDone ? '#22c55e' : '#a855f7'}; text-transform:uppercase;">Missão Semanal</span>
-            ${weeklyMissionDone ? `<span style="font-size:11px; font-weight:800; color:#22c55e; border:1px solid #22c55e; padding:3px 8px; border-radius:6px;">✓ CONCLUÍDA · +500 XP</span>` : ''}
+            <span style="font-size:13px; font-weight:bold; color:#a855f7; text-transform:uppercase;">Missão Semanal</span>
+            ${weeklyMissionDone ? `<span style="font-size:11px; font-weight:800; color:#a855f7; border:1px solid #a855f7; padding:3px 8px; border-radius:6px;">✓ CONCLUÍDA · +500 XP</span>` : ''}
         </div>
         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; text-align:center; background:rgba(0,0,0,0.3); padding:12px; border-radius:8px;">
             <div>
