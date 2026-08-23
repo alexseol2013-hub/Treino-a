@@ -544,6 +544,7 @@ function home(){
     
     const targetW = db.user.targetWorkouts || 5;
     const targetC = db.user.targetCardio || 60;
+    const weeklyMissionDone = weekly.thisWeekCount >= targetW && weekly.thisWeekCardio >= targetC;
     
     app.innerHTML=`<div class="app">${header('Painel do Caçador', false)}
     <div class="card" style="background: linear-gradient(135deg, rgba(20,15,35,0.95), rgba(10,8,20,0.98)); border: 1px solid #a855f7; box-shadow: 0 0 25px rgba(168, 85, 247, 0.25); border-radius: 12px; padding: 16px; margin-bottom: 15px;">
@@ -558,9 +559,10 @@ function home(){
         </div>
     </div>
 
-    <div class="card" style="background: rgba(138, 43, 226, 0.08); border: 1px solid rgba(168, 85, 247, 0.3); margin-bottom: 15px; padding: 14px;">
-        <div style="margin-bottom:8px;">
-            <span style="font-size:13px; font-weight:bold; color:#a855f7; text-transform:uppercase;">Missão Semanal</span>
+    <div class="card" style="background: ${weeklyMissionDone ? 'rgba(34,197,94,0.10)' : 'rgba(138, 43, 226, 0.08)'}; border: 1px solid ${weeklyMissionDone ? '#22c55e' : 'rgba(168, 85, 247, 0.3)'}; margin-bottom: 15px; padding: 14px; ${weeklyMissionDone ? 'box-shadow: 0 0 15px rgba(34,197,94,0.25);' : ''}">
+        <div style="margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:13px; font-weight:bold; color:${weeklyMissionDone ? '#22c55e' : '#a855f7'}; text-transform:uppercase;">Missão Semanal</span>
+            ${weeklyMissionDone ? `<span style="font-size:11px; font-weight:800; color:#22c55e; border:1px solid #22c55e; padding:3px 8px; border-radius:6px;">✓ CONCLUÍDA · +500 XP</span>` : ''}
         </div>
         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; text-align:center; background:rgba(0,0,0,0.3); padding:12px; border-radius:8px;">
             <div>
