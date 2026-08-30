@@ -38,8 +38,8 @@ E:{name:'Treino E',desc:'Bíceps, costas e abdômen',mob:'Mobilidade de ombros e
 ['Pulley frente aberto com 2 segundos de pico de contração',[['Aquecimento','1–2','10–15','1 min'],['Ajuste','1–2','4–6','1–2 min'],['Trabalho','3','8–12','2 min']]],
 ['Pulley frente triângulo com 2 segundos de pico de contração',[['Ajuste','1–2','4–6','1–2 min'],['Trabalho','3','8–12','2 min']], '1 drop na última série'],
 ['Serrote com 2 segundos de pico de contração',[['Ajuste','1–2','4–6','1–2 min'],['Trabalho','2','6–10','2 min']]],
-['Abdominal infra na torre com 2 segundos de pico de contração',[['Trabalho','3','RM','45 s']], '3x RM (máximo de repetições possíveis) · intervalo 1 min'],
-['Abdominal supra na prancha declinada',[['Trabalho','3','RM','45 s']], '3x RM (máximo de repetições possíveis) · intervalo 1 min'] ]}
+['Abdominal infra na torre com 2 segundos de pico de contração',[['Trabalho','3','RM','45 s']], '3x RM (máximo de repetições possíveis) · intervalo 45 s'],
+['Abdominal supra na prancha declinada',[['Trabalho','3','RM','45 s']], '3x RM (máximo de repetições possíveis) · intervalo 45 s'] ]}
 };
 
 const HOTMART_BASE = 'https://hotmart.com/en/club/alem-da-genetica-20/products/6315578/content/';
@@ -545,6 +545,8 @@ function home(){
     const targetW = db.user.targetWorkouts || 5;
     const targetC = db.user.targetCardio || 60;
     const weeklyMissionDone = weekly.thisWeekCount >= targetW && weekly.thisWeekCardio >= targetC;
+    const workoutsDone = weekly.thisWeekCount >= targetW;
+    const cardioDone = weekly.thisWeekCardio >= targetC;
     
     app.innerHTML=`<div class="app">${header('Painel do Caçador', false)}
     <div class="card" style="background: linear-gradient(135deg, rgba(20,15,35,0.95), rgba(10,8,20,0.98)); border: 1px solid #a855f7; box-shadow: 0 0 25px rgba(168, 85, 247, 0.25); border-radius: 12px; padding: 16px; margin-bottom: 15px;">
@@ -566,14 +568,14 @@ function home(){
         </div>
         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; text-align:center; background:rgba(0,0,0,0.3); padding:12px; border-radius:8px;">
             <div>
-                <small style="font-size:10px; color:#aaa;">Treinos</small><br>
+                <small style="font-size:10px; color:#aaa;">Treinos ${workoutsDone ? '<span style="color:#a855f7; font-weight:800;">✓</span>' : ''}</small><br>
                 <strong style="font-size:16px; color:#fff;">${weekly.thisWeekCount} / ${targetW}</strong>
                 <div style="width:100%; background:rgba(255,255,255,0.1); height:5px; border-radius:3px; overflow:hidden; margin-top:6px;">
                     <div style="width:${Math.min(100, Math.round(weekly.thisWeekCount/targetW*100))}%; background:#a855f7; height:100%;"></div>
                 </div>
             </div>
             <div>
-                <small style="font-size:10px; color:#aaa;">Cardio</small><br>
+                <small style="font-size:10px; color:#aaa;">Cardio ${cardioDone ? '<span style="color:#a855f7; font-weight:800;">✓</span>' : ''}</small><br>
                 <strong style="font-size:16px; color:#fff;">${weekly.thisWeekCardio}min / ${targetC}min</strong>
                 <div style="width:100%; background:rgba(255,255,255,0.1); height:5px; border-radius:3px; overflow:hidden; margin-top:6px;">
                     <div style="width:${Math.min(100, Math.round(weekly.thisWeekCardio/targetC*100))}%; background:#a855f7; height:100%;"></div>
