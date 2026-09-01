@@ -806,7 +806,7 @@ function expandedGroups(groups){let out=[];groups.forEach((g,gi)=>{const qty=par
 function makeKey(exi,si){return `${current}-${exi}-${si}`}
 
 function getCombinedRows(exIndex, groups, extraList){
-    const baseRows = expandedGroups(groups);
+    const baseRows = expandedGroups(groups).map((r, idx) => Object.assign({}, r, { si: idx }));
     const extras = extraList || [];
     const extraRows = extras.map((e,ei)=>({
         group:[e.type,'1','Livre','Livre'],
@@ -816,12 +816,16 @@ function getCombinedRows(exIndex, groups, extraList){
         isExtra:true,
         si: baseRows.length + ei
     }));
-    return baseRows.concat(extraRows);
+    const TYPE_ORDER = { 'Aquecimento': 0, 'Ajuste': 1, 'Trabalho': 2 };
+    const combined = baseRows.concat(extraRows);
+    combined.sort((a, b) => (TYPE_ORDER[a.group[0]] ?? 1) - (TYPE_ORDER[b.group[0]] ?? 1));
+    return combined;
 }
 
 function openAddSetModal(i){
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
+    modal.onclick = (ev) => { if (ev.target === modal) modal.remove(); };
     modal.innerHTML = `
         <div class="modal-box" style="text-align:center;">
             <div style="font-size:36px; margin-bottom:8px;">➕</div>
@@ -831,11 +835,13 @@ function openAddSetModal(i){
                 <button class="secondary" style="flex:1; padding:12px;" id="addSetAquecimento">Aquecimento</button>
                 <button class="primary" style="flex:1; padding:12px; background:linear-gradient(135deg, #8a2be2, #a855f7);" id="addSetAjuste">Ajuste</button>
             </div>
+            <button class="secondary" style="width:100%; padding:10px; margin-top:10px;" id="addSetCancel">Cancelar</button>
         </div>
     `;
     document.body.appendChild(modal);
     document.getElementById('addSetAquecimento').onclick = () => { modal.remove(); addExtraSet(i, 'Aquecimento'); };
     document.getElementById('addSetAjuste').onclick = () => { modal.remove(); addExtraSet(i, 'Ajuste'); };
+    document.getElementById('addSetCancel').onclick = () => modal.remove();
 }
 
 function addExtraSet(i, type){
@@ -973,8 +979,8 @@ function exerciseHTML(ex,i,d){
         </div>
         ${tech?`<div class="tech">⚡ ${esc(tech)}</div>`:''}`;
     
-    rows.forEach((r,arrIdx)=>{
-        const si = r.isExtra ? r.si : arrIdx;
+    rows.forEach((r)=>{
+        const si = r.si;
         const [type,qty,reps,rest]=r.group;
         const k=makeKey(i,si),x=d.sets[k]||{};
         if(x.done)return;
@@ -1023,7 +1029,7 @@ function exerciseHTML(ex,i,d){
         <button class="check" style="font-size:14px; padding:10px; font-weight:bold; margin-top:8px;" onclick="toggleSet(${i},${si})">□ Marcar série concluída</button></div>`;
     });
     
-    if(rows.some((r,arrIdx)=>!d.sets[makeKey(i, r.isExtra ? r.si : arrIdx)]?.done))html+=`<button class="exercise-finish" style="font-size:13px; font-weight:bold; padding:10px; margin-top:8px;" onclick="toggleEx(${i})">✓ Marcar exercício como concluído</button>`;
+    if(rows.some((r)=>!d.sets[makeKey(i, r.si)]?.done))html+=`<button class="exercise-finish" style="font-size:13px; font-weight:bold; padding:10px; margin-top:8px;" onclick="toggleEx(${i})">✓ Marcar exercício como concluído</button>`;
     return html+`</div>`;
 }
 
@@ -1049,7 +1055,7 @@ function isExerciseFullyDone(i){
     const ex = DATA[current].ex[i];
     if (!ex) return true;
     const rows = getCombinedRows(i, ex[1], d.extraSets[i]);
-    return rows.length > 0 && rows.every((r, arrIdx) => d.sets[makeKey(i, r.isExtra ? r.si : arrIdx)]?.done);
+    return rows.length > 0 && rows.every((r) => d.sets[makeKey(i, r.si)]?.done);
 }
 
 function findFirstIncompleteBefore(i){
@@ -1065,9 +1071,12 @@ function toggleSet(i,j){
     const isMarking = !d.sets[k].done;
 
     if (isMarking) {
-        // Checagem 1: série anterior do MESMO exercício ainda não concluída — bloqueia direto, sem confirmação
-        for (let si = 0; si < j; si++) {
-            if (!d.sets[makeKey(i, si)]?.done) {
+        // Checagem 1: série anterior do MESMO exercício (na ordem visual: Aquecimento > Ajuste > Trabalho) ainda não concluída — bloqueia direto, sem confirmação
+        const ex = DATA[current].ex[i];
+        const rows = getCombinedRows(i, ex[1], d.extraSets[i]);
+        const targetPos = rows.findIndex(r => r.si === j);
+        for (let p = 0; p < targetPos; p++) {
+            if (!d.sets[makeKey(i, rows[p].si)]?.done) {
                 centerAlert('Você ainda não marcou a série anterior deste exercício.');
                 return;
             }
@@ -1106,7 +1115,7 @@ function performToggleSet(i,j){
 
     const ex = DATA[current].ex[i];
     const rows = getCombinedRows(i, ex[1], d.extraSets[i]);
-    const allDone = rows.every((r, arrIdx) => d.sets[makeKey(i, r.isExtra ? r.si : arrIdx)]?.done);
+    const allDone = rows.every((r) => d.sets[makeKey(i, r.si)]?.done);
     
     if (allDone) d.exDone[i] = true;
     
