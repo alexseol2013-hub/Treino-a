@@ -97,6 +97,7 @@ if (!db.user.targetWorkouts) db.user.targetWorkouts = 5;
 if (!db.user.targetCardio) db.user.targetCardio = 60;
 
 let screen='home',current=null,timerId=null,totalTimerId=null;
+let editingRecordId = null, editingRecordSnapshot = null;
 let selectedExEvo = null;
 let currentRecordsFilter = 'ALL';
 let activeChartInstance = null;
@@ -1814,11 +1815,166 @@ function viewRecord(id){
         <div class="modal-box">
             <h3 style="color:#a855f7; margin-top:0;">${esc(r.name)}</h3>
             ${detailsHtml}
-            <button class="primary" style="width:100%; padding:10px; margin-top:15px; background:linear-gradient(135deg, #8a2be2, #a855f7);" onclick="this.parentElement.parentElement.remove()">Fechar</button>
+            <div style="display:flex; gap:8px; margin-top:15px;">
+                ${r.workout !== 'CARDIO' ? `<button class="secondary" style="flex:1; padding:10px; border-color:#a855f7;" onclick="this.parentElement.parentElement.parentElement.remove(); editRecordScreen('${id}')">✏️ Editar</button>` : ''}
+                <button class="primary" style="flex:1; padding:10px; background:linear-gradient(135deg, #8a2be2, #a855f7);" onclick="this.parentElement.parentElement.remove()">Fechar</button>
+            </div>
         </div>
     `;
     document.body.appendChild(modal);
 }
+
+function editRecordScreen(id){
+    stopTotalTimer();
+    screen = 'editRecord';
+    const original = db.history.find(x => x.id === id);
+    if (!original) { historyScreen(); return; }
+    editingRecordId = id;
+    editingRecordSnapshot = JSON.parse(JSON.stringify(original));
+    if (!editingRecordSnapshot.data.extraSets) editingRecordSnapshot.data.extraSets = {};
+    renderEditRecordScreen();
+}
+
+function renderEditRecordScreen(){
+    const r = editingRecordSnapshot;
+    const v = DATA[r.workout];
+    const dateStr = new Date(r.date).toLocaleDateString('pt-BR');
+
+    let html = `<div class="app">${header(`Editar: ${esc(r.name)}`)}
+    <p class="muted">Treino de ${dateStr}. Altere reps, carga ou adicione/remova séries e salve.</p>`;
+
+    if (v) {
+        v.ex.forEach((ex, i) => {
+            const [name, groups] = ex;
+            const rows = getCombinedRows(i, groups, r.data.extraSets[i]);
+            const baseCount = expandedGroups(groups).length;
+
+            html += `<div class="card" style="padding:14px; margin-top:12px;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div style="font-size:15px; font-weight:bold; color:#fff;">${i+1}. ${esc(name)}</div>
+                    <button class="mini" type="button" style="font-size:11px; padding:4px 8px;" onclick="editOpenAddSetModal(${i})">➕ Série</button>
+                </div>`;
+
+            let lastGroup = -2;
+            rows.forEach((row) => {
+                const si = row.si;
+                const [type] = row.group;
+                const key = `${r.workout}-${i}-${si}`;
+                const x = r.data.sets[key] || {};
+
+                if (row.isExtra) {
+                    html += `<div class="group-label" style="display:flex; justify-content:space-between; align-items:center;">${esc(type)} extra <span><button class="mini" type="button" style="font-size:10px; padding:2px 6px;" onclick="editRemoveExtraSet(${i}, ${si - baseCount})">✕ remover</button></span></div>`;
+                } else if (row.groupIndex !== lastGroup) {
+                    html += `<div class="group-label">${esc(type)}</div>`;
+                    lastGroup = row.groupIndex;
+                }
+
+                html += `<div class="set" style="padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.06);">
+                    <div class="fields">
+                        <label style="font-size:11px; font-weight:bold; color:#aaa;">REPS
+                            <input type="number" min="0" inputmode="numeric" style="font-size:14px; font-weight:bold; text-align:center; margin-top:4px;" value="${esc(x.reps ?? '')}" onchange="editSetVal(${i},${si},'reps',this.value)">
+                        </label>
+                        <label style="font-size:11px; font-weight:bold; color:#aaa;">CARGA (KG)
+                            <input type="number" min="0" step="0.5" inputmode="decimal" style="font-size:14px; font-weight:bold; text-align:center; margin-top:4px;" value="${esc(x.kg ?? '')}" onchange="editSetVal(${i},${si},'kg',this.value)">
+                        </label>
+                    </div>
+                    <label style="display:flex; align-items:center; gap:6px; margin-top:6px; font-size:12px; color:#a855f7;">
+                        <input type="checkbox" ${x.done ? 'checked' : ''} onchange="editSetVal(${i},${si},'done',this.checked)"> Concluída
+                    </label>
+                </div>`;
+            });
+            html += `</div>`;
+        });
+    }
+
+    html += `
+    <button class="primary" style="margin-top:20px; width:100%; padding:16px; font-weight:bold; background: linear-gradient(135deg, #8a2be2, #a855f7);" onclick="saveEditedRecord()">💾 Salvar alterações</button>
+    <button class="secondary" style="margin-top:8px;" onclick="cancelEditRecord()">Cancelar</button>
+    </div>`;
+
+    app.innerHTML = html;
+}
+
+function editSetVal(i, si, field, value){
+    const key = `${editingRecordSnapshot.workout}-${i}-${si}`;
+    editingRecordSnapshot.data.sets[key] = editingRecordSnapshot.data.sets[key] || {};
+    editingRecordSnapshot.data.sets[key][field] = value;
+    // Não re-renderiza a tela toda para não perder o foco do campo sendo editado
+}
+
+function editOpenAddSetModal(i){
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.onclick = (ev) => { if (ev.target === modal) modal.remove(); };
+    modal.innerHTML = `
+        <div class="modal-box" style="text-align:center;">
+            <div style="font-size:36px; margin-bottom:8px;">➕</div>
+            <h3 style="color:#a855f7; margin:0 0 6px 0; font-size:18px;">Adicionar série extra</h3>
+            <p style="color:#ccc; font-size:13px; margin-bottom:18px;">Qual o tipo dessa série a mais?</p>
+            <div style="display:flex; gap:10px;">
+                <button class="secondary" style="flex:1; padding:12px;" id="editAddAquecimento">Aquecimento</button>
+                <button class="primary" style="flex:1; padding:12px; background:linear-gradient(135deg, #8a2be2, #a855f7);" id="editAddAjuste">Ajuste</button>
+            </div>
+            <button class="secondary" style="width:100%; padding:10px; margin-top:10px;" id="editAddCancel">Cancelar</button>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    document.getElementById('editAddAquecimento').onclick = () => { modal.remove(); editAddExtraSet(i, 'Aquecimento'); };
+    document.getElementById('editAddAjuste').onclick = () => { modal.remove(); editAddExtraSet(i, 'Ajuste'); };
+    document.getElementById('editAddCancel').onclick = () => modal.remove();
+}
+
+function editAddExtraSet(i, type){
+    editingRecordSnapshot.data.extraSets[i] = editingRecordSnapshot.data.extraSets[i] || [];
+    editingRecordSnapshot.data.extraSets[i].push({ type });
+    renderEditRecordScreen();
+}
+
+function editRemoveExtraSet(i, extraIdx){
+    const r = editingRecordSnapshot;
+    const list = r.data.extraSets[i] || [];
+    const ex = DATA[r.workout].ex[i];
+    const baseCount = expandedGroups(ex[1]).length;
+    const si = baseCount + extraIdx;
+    delete r.data.sets[`${r.workout}-${i}-${si}`];
+    list.splice(extraIdx, 1);
+    for (let n = extraIdx; n < list.length; n++) {
+        const oldKey = `${r.workout}-${i}-${baseCount + n + 1}`;
+        const newKey = `${r.workout}-${i}-${baseCount + n}`;
+        if (r.data.sets[oldKey]) { r.data.sets[newKey] = r.data.sets[oldKey]; delete r.data.sets[oldKey]; }
+    }
+    renderEditRecordScreen();
+}
+
+function saveEditedRecord(){
+    const r = editingRecordSnapshot;
+    let totalVolume = 0, totalWeightRaw = 0;
+    Object.values(r.data.sets || {}).forEach(s => {
+        if (s.done && s.kg !== undefined) {
+            const kg = parseFloat(s.kg) || 0;
+            const reps = parseInt(s.reps) || 0;
+            totalVolume += kg * reps;
+            totalWeightRaw += kg;
+        }
+    });
+    r.totalVolume = totalVolume;
+    r.totalWeightRaw = totalWeightRaw;
+
+    const idx = db.history.findIndex(x => x.id === editingRecordId);
+    if (idx !== -1) db.history[idx] = r;
+    save();
+    editingRecordId = null;
+    editingRecordSnapshot = null;
+    toast('Treino atualizado!');
+    historyScreen();
+}
+
+function cancelEditRecord(){
+    editingRecordId = null;
+    editingRecordSnapshot = null;
+    historyScreen();
+}
+
 
 function editWorkoutExercises(workoutKey) {
     const workout = DATA[workoutKey];
