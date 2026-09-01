@@ -799,11 +799,70 @@ function getLastExerciseData(workoutKey, exIndex, setIndex){
     return null;
 }
 
-function draft(){db.drafts[current]??={sets:{},exDone:{},startedAt:null, scheduledRestTotal:0};return db.drafts[current]}
+function draft(){db.drafts[current]??={sets:{},exDone:{},startedAt:null, scheduledRestTotal:0, extraSets:{}};if(!db.drafts[current].extraSets)db.drafts[current].extraSets={};return db.drafts[current]}
 function openWorkout(k){current=k;screen='workout';draft();save();renderWorkout()}
 function parseQty(q){const m=String(q).match(/(\d+)\s*[–-]\s*(\d+)/);if(m)return Number(m[2]);const n=String(q).match(/\d+/);return n?Number(n[0]):1}
 function expandedGroups(groups){let out=[];groups.forEach((g,gi)=>{const qty=parseQty(g[1]);for(let n=1;n<=qty;n++)out.push({group:g,groupIndex:gi,number:n,total:qty});});return out}
 function makeKey(exi,si){return `${current}-${exi}-${si}`}
+
+function getCombinedRows(exIndex, groups, extraList){
+    const baseRows = expandedGroups(groups);
+    const extras = extraList || [];
+    const extraRows = extras.map((e,ei)=>({
+        group:[e.type,'1','Livre','Livre'],
+        groupIndex:-1,
+        number:1,
+        total:1,
+        isExtra:true,
+        si: baseRows.length + ei
+    }));
+    return baseRows.concat(extraRows);
+}
+
+function openAddSetModal(i){
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+        <div class="modal-box" style="text-align:center;">
+            <div style="font-size:36px; margin-bottom:8px;">➕</div>
+            <h3 style="color:#a855f7; margin:0 0 6px 0; font-size:18px;">Adicionar série extra</h3>
+            <p style="color:#ccc; font-size:13px; margin-bottom:18px;">Qual o tipo dessa série a mais?</p>
+            <div style="display:flex; gap:10px;">
+                <button class="secondary" style="flex:1; padding:12px;" id="addSetAquecimento">Aquecimento</button>
+                <button class="primary" style="flex:1; padding:12px; background:linear-gradient(135deg, #8a2be2, #a855f7);" id="addSetAjuste">Ajuste</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    document.getElementById('addSetAquecimento').onclick = () => { modal.remove(); addExtraSet(i, 'Aquecimento'); };
+    document.getElementById('addSetAjuste').onclick = () => { modal.remove(); addExtraSet(i, 'Ajuste'); };
+}
+
+function addExtraSet(i, type){
+    const d = draft();
+    d.extraSets[i] = d.extraSets[i] || [];
+    d.extraSets[i].push({ type });
+    save();
+    renderWorkout();
+    toast(`Série extra de ${type} adicionada`);
+}
+
+function removeExtraSet(i, extraIdx){
+    const d = draft();
+    const list = d.extraSets[i] || [];
+    const baseCount = expandedGroups(DATA[current].ex[i][1]).length;
+    const si = baseCount + extraIdx;
+    delete d.sets[makeKey(i, si)];
+    list.splice(extraIdx, 1);
+    // reindexa as chaves das extras seguintes para não deixar buraco
+    for(let n = extraIdx; n < list.length; n++){
+        const oldKey = makeKey(i, baseCount + n + 1);
+        const newKey = makeKey(i, baseCount + n);
+        if(d.sets[oldKey]){ d.sets[newKey] = d.sets[oldKey]; delete d.sets[oldKey]; }
+    }
+    save();
+    renderWorkout();
+}
 
 function calculateDraftMetrics(d){
     let totalVolume = 0;
@@ -899,7 +958,7 @@ function exerciseHTML(ex,i,d){
     const [name,groups,tech]=ex;
     const done=!!d.exDone[i];
     if(done)return '';
-    const rows=expandedGroups(groups);
+    const rows=getCombinedRows(i, groups, d.extraSets[i]);
     let lastGroup=-1;
     const pr = getExercisePR(current, i);
     
@@ -909,15 +968,19 @@ function exerciseHTML(ex,i,d){
             <div style="display:flex; gap:6px; margin-left:8px;">
                 ${EXERCISE_VIDEOS[name] ? `<a class="mini" href="${EXERCISE_VIDEOS[name]}" target="_blank" rel="noopener" style="font-size:11px; padding:4px 8px; text-decoration:none; display:inline-flex; align-items:center;">🎬 Vídeo</a>` : ''}
                 <button class="mini" type="button" style="font-size:11px; padding:4px 8px;" onclick="swapExercise(${i})">🔄 Trocar</button>
+                <button class="mini" type="button" style="font-size:11px; padding:4px 8px;" onclick="openAddSetModal(${i})">➕ Série</button>
             </div>
         </div>
         ${tech?`<div class="tech">⚡ ${esc(tech)}</div>`:''}`;
     
-    rows.forEach((r,si)=>{
+    rows.forEach((r,arrIdx)=>{
+        const si = r.isExtra ? r.si : arrIdx;
         const [type,qty,reps,rest]=r.group;
         const k=makeKey(i,si),x=d.sets[k]||{};
         if(x.done)return;
-        if(r.groupIndex!==lastGroup){
+        if(r.isExtra){
+            html+=`<div class="group-label" style="display:flex; justify-content:space-between; align-items:center;">${esc(type)} extra <span><button class="mini" type="button" style="font-size:10px; padding:2px 6px;" onclick="removeExtraSet(${i},${r.si - expandedGroups(groups).length})">✕ remover</button></span></div>`;
+        } else if(r.groupIndex!==lastGroup){
             html+=`<div class="group-label">${esc(type)} <span>${esc(qty)} série(s) · ${esc(reps)} reps · ${esc(rest)}</span></div>`;
             lastGroup=r.groupIndex;
         }
@@ -960,7 +1023,7 @@ function exerciseHTML(ex,i,d){
         <button class="check" style="font-size:14px; padding:10px; font-weight:bold; margin-top:8px;" onclick="toggleSet(${i},${si})">□ Marcar série concluída</button></div>`;
     });
     
-    if(rows.some((r,si)=>!d.sets[makeKey(i,si)]?.done))html+=`<button class="exercise-finish" style="font-size:13px; font-weight:bold; padding:10px; margin-top:8px;" onclick="toggleEx(${i})">✓ Marcar exercício como concluído</button>`;
+    if(rows.some((r,arrIdx)=>!d.sets[makeKey(i, r.isExtra ? r.si : arrIdx)]?.done))html+=`<button class="exercise-finish" style="font-size:13px; font-weight:bold; padding:10px; margin-top:8px;" onclick="toggleEx(${i})">✓ Marcar exercício como concluído</button>`;
     return html+`</div>`;
 }
 
@@ -985,8 +1048,8 @@ function isExerciseFullyDone(i){
     if (d.exDone[i]) return true;
     const ex = DATA[current].ex[i];
     if (!ex) return true;
-    const rows = expandedGroups(ex[1]);
-    return rows.length > 0 && rows.every((r, si) => d.sets[makeKey(i, si)]?.done);
+    const rows = getCombinedRows(i, ex[1], d.extraSets[i]);
+    return rows.length > 0 && rows.every((r, arrIdx) => d.sets[makeKey(i, r.isExtra ? r.si : arrIdx)]?.done);
 }
 
 function findFirstIncompleteBefore(i){
@@ -1042,8 +1105,8 @@ function performToggleSet(i,j){
     d.sets[k].done=!d.sets[k].done;
 
     const ex = DATA[current].ex[i];
-    const rows = expandedGroups(ex[1]);
-    const allDone = rows.every((r, si) => d.sets[makeKey(i, si)]?.done);
+    const rows = getCombinedRows(i, ex[1], d.extraSets[i]);
+    const allDone = rows.every((r, arrIdx) => d.sets[makeKey(i, r.isExtra ? r.si : arrIdx)]?.done);
     
     if (allDone) d.exDone[i] = true;
     
@@ -1304,6 +1367,17 @@ function renderExerciseEvoDetails(workoutKey, exName) {
                         // Aquecimento + Ajuste contam juntos como volume de ajuste
                         volAjuste += setVol;
                     }
+                });
+
+                // Séries extras adicionadas manualmente (sempre Ajuste/Aquecimento) também entram no volume de ajuste
+                const baseCount = expandedGroups(exInfo[1]).length;
+                const extras = record.data?.extraSets?.[exIndex] || [];
+                extras.forEach((e, ei) => {
+                    const si = baseCount + ei;
+                    const setData = record.data?.sets?.[`${record.workout}-${exIndex}-${si}`] || {};
+                    const kg = parseFloat(setData.kg) || 0;
+                    const reps = parseInt(setData.reps) || 0;
+                    volAjuste += kg * reps;
                 });
 
                 const volTotal = volAjuste + volTrabalho;
@@ -1699,6 +1773,16 @@ function viewRecord(id){
                 const x=r.data.sets[`${r.workout}-${i}-${j}`]||{};
                 detailsHtml+=`<div style="font-size:12px; margin-top:4px; display:flex; justify-content:space-between;">
                     <span>Série ${row.number}/${row.total} (${row.group[0]})</span>
+                    <strong>${x.kg||'—'} kg × ${x.reps||'—'} reps ${x.done?'✓':''}</strong>
+                </div>`;
+            });
+            const extras = r.data?.extraSets?.[i] || [];
+            const baseCount = expandedGroups(ex[1]).length;
+            extras.forEach((e, ei) => {
+                const si = baseCount + ei;
+                const x = r.data.sets[`${r.workout}-${i}-${si}`] || {};
+                detailsHtml+=`<div style="font-size:12px; margin-top:4px; display:flex; justify-content:space-between; color:#c084fc;">
+                    <span>Série extra (${esc(e.type)})</span>
                     <strong>${x.kg||'—'} kg × ${x.reps||'—'} reps ${x.done?'✓':''}</strong>
                 </div>`;
             });
