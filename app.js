@@ -96,6 +96,7 @@ db = db || {
 if (!db.user.targetWorkouts) db.user.targetWorkouts = 5;
 if (!db.user.targetCardio) db.user.targetCardio = 60;
 if (!db.customExerciseNames) db.customExerciseNames = {};
+if (!db.user.bonusXP) db.user.bonusXP = 0;
 
 // Reaplica nomes de exercícios renomeados manualmente (persistidos), sobrescrevendo os nomes padrão do código
 Object.entries(db.customExerciseNames).forEach(([wKey, exMap]) => {
@@ -364,7 +365,7 @@ function getRequiredXPForLevel(lvl) {
 
 function getUserStats(){
     let totalWorkouts = 0;
-    let totalXP = 0;
+    let totalXP = db.user.bonusXP || 0;
     let totalVolume = 0;
     let totalCardioMin = 0;
     let totalSetsDone = 0;
@@ -2046,6 +2047,15 @@ function settingsScreen(){
     </div>
 
     <div class="card" style="margin-bottom:15px;">
+        <div style="font-weight:bold; margin-bottom:8px; color:#a855f7;">⚡ XP de Compensação</div>
+        <p class="muted" style="font-size:12px; margin-bottom:8px;">Use só para corrigir nível/XP perdido em resets ou importações de backup incompletas. Fica somado ao XP calculado normalmente pelo histórico.</p>
+        <label style="font-size:12px;">XP extra
+            <input type="number" id="bonusXPInput" min="0" step="1" value="${db.user.bonusXP || 0}">
+        </label>
+        <button class="secondary" style="margin-top:8px;" onclick="updateBonusXP()">💾 Salvar XP de Compensação</button>
+    </div>
+
+    <div class="card" style="margin-bottom:15px;">
         <div style="font-weight:bold; margin-bottom:8px; color:#a855f7;">✏️ Editar Exercícios dos Treinos</div>
         <div style="display:flex; flex-direction:column; gap:6px;">
             ${Object.keys(DATA).map(k => `<button class="secondary" style="text-align:left; padding:10px;" onclick="editWorkoutExercises('${k}')">Editar ${DATA[k].name}</button>`).join('')}
@@ -2077,6 +2087,13 @@ function updateWeeklyTargets(){
     if(!isNaN(tc) && tc >= 0) db.user.targetCardio = tc;
     save();
     toast('Metas semanais atualizadas!');
+}
+
+function updateBonusXP(){
+    const bx = parseInt(document.getElementById('bonusXPInput').value);
+    db.user.bonusXP = (!isNaN(bx) && bx >= 0) ? bx : 0;
+    save();
+    toast('XP de compensação atualizado!');
 }
 
 function clearDrafts(){
