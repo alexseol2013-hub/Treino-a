@@ -773,30 +773,32 @@ function finishCardio(){
     </div>`;
 }
 
-function getExercisePR(workoutKey, exIndex) {
-    const exName = DATA[workoutKey]?.ex[exIndex]?.[0];
-    if(!exName) return { kg: 0, reps: 0 };
-    let bestKg = 0, bestReps = 0;
-    
+// Maior carga já feita em cada tipo de série (Aquecimento, Ajuste, Trabalho) de um exercício,
+// somando todos os treinos em que ele aparece (inclusive séries extras). Empate de carga: vence quem fez mais reps.
+// Retorna algo como { Aquecimento:{kg,reps}, Ajuste:{kg,reps}, Trabalho:{kg,reps} } — só com os tipos que têm registro.
+function getExercisePRByType(exName) {
+    const prs = {};
+    if(!exName) return prs;
+
     db.history.forEach(r => {
         const wData = DATA[r.workout];
-        if(!wData) return;
+        if(!wData || !r.data?.sets) return;
         wData.ex.forEach((exInfo, i) => {
-            if(exInfo[0] === exName) {
-                expandedGroups(exInfo[1]).forEach((rSet, j) => {
-                    if(rSet.group[0] === 'Trabalho') {
-                        const setData = r.data?.sets?.[`${r.workout}-${i}-${j}`] || {};
-                        const kg = parseFloat(setData.kg) || 0;
-                        const reps = parseInt(setData.reps) || 0;
-                        if(kg > bestKg || (kg === bestKg && reps > bestReps)){
-                            bestKg = kg; bestReps = reps;
-                        }
-                    }
-                });
-            }
+            if(exInfo[0] !== exName) return;
+            const baseRows = expandedGroups(exInfo[1]);
+            const consider = (type, setData) => {
+                if(!setData || !setData.done) return;
+                const kg = parseFloat(setData.kg) || 0;
+                const reps = parseInt(setData.reps) || 0;
+                if(kg <= 0) return;
+                const cur = prs[type];
+                if(!cur || kg > cur.kg || (kg === cur.kg && reps > cur.reps)) prs[type] = { kg, reps };
+            };
+            baseRows.forEach((rSet, j) => consider(rSet.group[0], r.data.sets[`${r.workout}-${i}-${j}`]));
+            (r.data.extraSets?.[i] || []).forEach((e, ei) => consider(e.type, r.data.sets[`${r.workout}-${i}-${baseRows.length + ei}`]));
         });
     });
-    return { kg: bestKg, reps: bestReps };
+    return prs;
 }
 
 function getLastExerciseData(workoutKey, exIndex, setIndex){
@@ -975,11 +977,27 @@ function swapExercise(i){
 function exerciseHTML(ex,i,d){
     const [name,groups,tech]=ex;
     const done=!!d.exDone[i];
-    if(done)return '';
     const rows=getCombinedRows(i, groups, d.extraSets[i]);
+
+    // Exercício concluído: fica numa linha compacta, com botão para reabrir (corrigir carga/reps ou marcação sem querer)
+    if(done){
+        const doneCount = rows.filter(r => d.sets[makeKey(i, r.si)]?.done).length;
+        return `<div class="card" style="padding:10px 14px; margin-top:12px; opacity:0.8; display:flex; justify-content:space-between; align-items:center; gap:8px;">
+            <div style="flex:1; font-size:14px; font-weight:bold; color:#c084fc;">✓ ${i+1}. ${esc(name)} <span style="font-size:11px; color:#aaa; font-weight:normal;">· ${doneCount}/${rows.length} séries</span></div>
+            <button class="mini" type="button" style="font-size:11px; padding:4px 8px; white-space:nowrap;" onclick="reopenExercise(${i})">↩ Reabrir</button>
+        </div>`;
+    }
+
     let lastGroup=-1;
-    const pr = getExercisePR(current, i);
-    
+    const prByType = getExercisePRByType(name);
+    const pr = prByType['Trabalho'] || { kg: 0, reps: 0 };
+
+    // A técnica (drop / rest pause) vale para a ÚLTIMA série de trabalho do exercício.
+    // Séries extras (aquecimento/ajuste) entram antes do trabalho, então nunca podem herdar a técnica.
+    const workRows = rows.filter(r => r.group[0] === 'Trabalho');
+    const techRow = workRows.length ? workRows[workRows.length - 1] : rows[rows.length - 1];
+    const techSi = techRow ? techRow.si : -1;
+
     let html=`<div class="card" style="padding:14px; margin-top:12px;">
         <div class="exercise-head" style="display:flex; justify-content:space-between; align-items:center;">
             <div class="exercise-name" style="flex:1; font-size:16px !important; font-weight:bold; color:#fff;">${i+1}. ${esc(name)}</div>
@@ -995,7 +1013,15 @@ function exerciseHTML(ex,i,d){
         const si = r.si;
         const [type,qty,reps,rest]=r.group;
         const k=makeKey(i,si),x=d.sets[k]||{};
-        if(x.done)return;
+        if(x.done){
+            // Série concluída: linha compacta com botão para voltar (editar carga/reps de novo)
+            const doneLabel = r.isExtra ? `${esc(type)} extra` : `${esc(type)} · Série ${r.number}/${r.total}`;
+            html+=`<div style="display:flex; justify-content:space-between; align-items:center; gap:8px; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.06);">
+                <div style="flex:1; font-size:13px; color:#c084fc;">✓ ${doneLabel} <strong style="color:#fff;">${esc(x.kg ?? '—')} kg × ${esc(x.reps ?? '—')}</strong></div>
+                <button class="mini" type="button" style="font-size:11px; padding:4px 8px; white-space:nowrap;" onclick="reopenSet(${i},${si})">↩ Voltar</button>
+            </div>`;
+            return;
+        }
         if(r.isExtra){
             html+=`<div class="group-label" style="display:flex; justify-content:space-between; align-items:center;">${esc(type)} extra <span><button class="mini" type="button" style="font-size:10px; padding:2px 6px;" onclick="removeExtraSet(${i},${r.si - expandedGroups(groups).length})">✕ remover</button></span></div>`;
         } else if(r.groupIndex!==lastGroup){
@@ -1005,7 +1031,7 @@ function exerciseHTML(ex,i,d){
         let special='';
         if(tech){
             const lower=tech.toLowerCase();
-            const isLast=si===rows.length-1;
+            const isLast=si===techSi;
             if((lower.includes('drop')||lower.includes('rest pause'))&&isLast)special=`<div class="tech-inline">🔥 ${esc(tech)}</div>`;
         }
         
@@ -1019,6 +1045,12 @@ function exerciseHTML(ex,i,d){
         const isPR = isTrabalho && currentKg > 0 && (currentKg > pr.kg || (currentKg === pr.kg && currentReps > pr.reps && pr.kg > 0));
 
         const badgeHtml = isPR ? `<span class="pr-badge-live">⚡ NOVO PR!</span>` : `<span style="font-size:11px; color:#a855f7; font-weight:bold;">${prevLabel}</span>`;
+
+        // PR do tipo desta série (aquecimento, ajuste ou trabalho): maior carga já feita nesse exercício
+        const typePR = prByType[type];
+        const prLine = typePR
+            ? `<div style="margin-top:6px; font-size:12px; color:#c084fc;">🏆 PR de ${esc(type)}: <strong style="color:#fff;">${typePR.kg} kg × ${typePR.reps}</strong></div>`
+            : `<div style="margin-top:6px; font-size:12px; color:#777;">🏆 PR de ${esc(type)}: sem registro</div>`;
 
         html+=`<div class="set" style="padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.06);"><div class="sethead"><div class="settype" style="font-size:14px; font-weight:bold; color:#a855f7;">${esc(type)} · Série ${r.number}/${r.total}</div>${badgeHtml}</div>
         <div class="fields" style="margin-top:6px;">
@@ -1037,6 +1069,7 @@ function exerciseHTML(ex,i,d){
                 </div>
             </label>
         </div>
+        ${prLine}
         <div class="obs" style="margin-top:6px;"><label style="font-size:10px; color:#aaa;">OBSERVAÇÃO<textarea onchange="setVal(${i},${si},'obs',this.value)">${esc(x.obs||'')}</textarea></label></div>${special}
         <button class="check" style="font-size:14px; padding:10px; font-weight:bold; margin-top:8px;" onclick="toggleSet(${i},${si})">□ Marcar série concluída</button></div>`;
     });
@@ -1158,6 +1191,26 @@ function performToggleEx(i){
     d.exDone[i]=!d.exDone[i];
     save();
     renderWorkout();
+}
+
+// Volta uma série concluída para "em andamento" mantendo carga/reps já digitadas, para corrigir e marcar de novo
+function reopenSet(i,j){
+    const d=draft(),k=makeKey(i,j);
+    if(!d.sets[k]) return;
+    d.sets[k].done=false;
+    d.exDone[i]=false;
+    save();
+    renderWorkout();
+    toast('Série reaberta');
+}
+
+// Reabre um exercício concluído (as séries pendentes voltam a aparecer; as concluídas ganham o botão "Voltar")
+function reopenExercise(i){
+    const d=draft();
+    d.exDone[i]=false;
+    save();
+    renderWorkout();
+    toast('Exercício reaberto');
 }
 
 function startWorkout(){
