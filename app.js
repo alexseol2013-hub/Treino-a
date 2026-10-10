@@ -1049,7 +1049,7 @@ function exerciseHTML(ex,i,d){
         // PR do tipo desta série (aquecimento, ajuste ou trabalho): maior carga já feita nesse exercício
         const typePR = prByType[type];
         const prLine = typePR
-            ? `<div style="margin-top:6px; font-size:12px; color:#c084fc;">🏆 PR de ${esc(type)}: <strong style="color:#fff;">${typePR.kg} kg × ${typePR.reps}</strong></div>`
+            ? `<div style="margin-top:6px; font-size:12px; color:#c084fc;">🏆 PR de ${esc(type)}: <strong style="color:#fff;">${typePR.reps} reps × ${typePR.kg} kg</strong></div>`
             : `<div style="margin-top:6px; font-size:12px; color:#777;">🏆 PR de ${esc(type)}: sem registro</div>`;
 
         html+=`<div class="set" style="padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.06);"><div class="sethead"><div class="settype" style="font-size:14px; font-weight:bold; color:#a855f7;">${esc(type)} · Série ${r.number}/${r.total}</div>${badgeHtml}</div>
