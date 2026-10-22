@@ -813,6 +813,18 @@ function getLastExerciseData(workoutKey, exIndex, setIndex){
     return null;
 }
 
+// Última observação (não vazia) registrada nesta mesma série em treinos anteriores do mesmo dia
+function getLastObs(workoutKey, exIndex, setIndex){
+    const history = db.history.slice().sort((a,b)=>new Date(b.date)-new Date(a.date));
+    for(let record of history){
+        if(record.workout !== workoutKey) continue;
+        const set = record.data?.sets?.[`${workoutKey}-${exIndex}-${setIndex}`];
+        const o = set && typeof set.obs === 'string' ? set.obs.trim() : '';
+        if(o) return { obs: o, date: record.date };
+    }
+    return null;
+}
+
 function draft(){db.drafts[current]??={sets:{},exDone:{},startedAt:null, scheduledRestTotal:0, extraSets:{}};if(!db.drafts[current].extraSets)db.drafts[current].extraSets={};return db.drafts[current]}
 function openWorkout(k){current=k;screen='workout';draft();save();renderWorkout()}
 function parseQty(q){const m=String(q).match(/(\d+)\s*[–-]\s*(\d+)/);if(m)return Number(m[2]);const n=String(q).match(/\d+/);return n?Number(n[0]):1}
@@ -1047,6 +1059,10 @@ function exerciseHTML(ex,i,d){
         const badgeHtml = isPR ? `<span class="pr-badge-live">⚡ NOVO PR!</span>` : `<span style="font-size:11px; color:#a855f7; font-weight:bold;">${prevLabel}</span>`;
 
         // PR do tipo desta série (aquecimento, ajuste ou trabalho): maior carga já feita nesse exercício
+        const lastObs = getLastObs(current, i, si);
+        let lastObsDate = '';
+        if(lastObs){ const dt = new Date(lastObs.date); if(!isNaN(dt)) lastObsDate = ` (${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')})`; }
+        const lastObsLine = lastObs ? `<div style="margin-top:6px; font-size:12px; color:#c084fc;">📝 Última obs${esc(lastObsDate)}: <strong style="color:#fff; font-weight:normal;">${esc(lastObs.obs)}</strong></div>` : '';
         const typePR = prByType[type];
         const prLine = typePR
             ? `<div style="margin-top:6px; font-size:12px; color:#c084fc;">🏆 PR de ${esc(type)}: <strong style="color:#fff;">${typePR.reps} reps × ${typePR.kg} kg</strong></div>`
@@ -1070,11 +1086,13 @@ function exerciseHTML(ex,i,d){
             </label>
         </div>
         ${prLine}
+        ${lastObsLine}
         <div class="obs" style="margin-top:6px;"><label style="font-size:10px; color:#aaa;">OBSERVAÇÃO<textarea onchange="setVal(${i},${si},'obs',this.value)">${esc(x.obs||'')}</textarea></label></div>${special}
         <button class="check" style="font-size:14px; padding:10px; font-weight:bold; margin-top:8px;" onclick="toggleSet(${i},${si})">□ Marcar série concluída</button></div>`;
     });
     
-    if(rows.some((r)=>!d.sets[makeKey(i, r.si)]?.done))html+=`<button class="exercise-finish" style="font-size:13px; font-weight:bold; padding:10px; margin-top:8px;" onclick="toggleEx(${i})">✓ Marcar exercício como concluído</button>`;
+    const hasPending = rows.some((r)=>!d.sets[makeKey(i, r.si)]?.done);
+    html+=`<button class="exercise-finish" style="font-size:13px; font-weight:bold; padding:10px; margin-top:8px;" onclick="toggleEx(${i})">${hasPending ? '✓ Marcar exercício como concluído' : '✓ Fechar exercício'}</button>`;
     return html+`</div>`;
 }
 
